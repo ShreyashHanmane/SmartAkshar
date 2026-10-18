@@ -6,33 +6,33 @@ Status: works / broken / UI-only / missing / disabled (Coming soon). "Module" re
 
 ## Shared shell (sidebar; mobile tab bar)
 
-| Element                               | Expected behavior                                        | Status               | Module | Target file                                    |
-| ------------------------------------- | -------------------------------------------------------- | -------------------- | ------ | ---------------------------------------------- |
-| Logo + tagline                        | Original Figma logo; recolored in dark                   | missing (SVG needed) | 2      | `src/ui/Logo.tsx`                              |
-| Dashboard nav                         | Go to dashboard; active state                            | missing              | 2      | `src/app/shell/Sidebar.tsx`                    |
-| Whiteboard nav                        | Go to notebooks/whiteboard                               | missing              | 2      | same                                           |
-| Flashcards nav + due badge            | Go to flashcards; badge = real due-today count           | missing              | 2, 7   | same                                           |
-| Library nav                           | Go to library                                            | missing              | 2      | same                                           |
-| Subjects list (dot, name, count)      | Filter by subject; counts from data                      | missing              | 2      | `src/features/subjects/`                       |
-| Subject create / rename / delete      | Manage subjects (§9.2)                                   | missing              | 2      | same                                           |
-| + New notebook                        | Dialog asking only title + subject                       | missing              | 3      | `src/features/notebooks/NewNotebookDialog.tsx` |
-| Settings                              | Go to settings                                           | missing              | 2      | `Sidebar.tsx`                                  |
-| Mobile bottom tabs + floating "+ New" | Home, Whiteboard, Flashcards, Profile; hidden in editors | missing              | 2      | `src/app/shell/MobileTabs.tsx`                 |
+| Element                               | Expected behavior                                        | Status                                                                                 | Module | Target file                             |
+| ------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------ | --------------------------------------- |
+| Logo + tagline                        | Original Figma logo; recolored in dark                   | missing (SVG needed)                                                                   | 2      | `src/ui/Logo.tsx`                       |
+| Dashboard nav                         | Go to dashboard; active state                            | works                                                                                  | 2      | `src/app/shell/Sidebar.tsx`             |
+| Whiteboard nav                        | Go to notebooks/whiteboard                               | works (opens the notebooks area; list built in Module 3)                               | 2      | `src/app/shell/Sidebar.tsx`             |
+| Flashcards nav + due badge            | Go to flashcards; badge = real due-today count           | works for navigation; due badge missing (Module 7)                                     | 2, 7   | `src/app/shell/Sidebar.tsx`             |
+| Library nav                           | Go to library                                            | works (page built in Module 6)                                                         | 2      | `src/app/shell/Sidebar.tsx`             |
+| Subjects list (dot, name, count)      | Filter by subject; counts from data                      | works (list, colour dot, filter link); counts missing until notebooks exist (Module 3) | 2      | `src/features/subjects/SubjectsNav.tsx` |
+| Subject create / rename / delete      | Manage subjects (§9.2)                                   | works                                                                                  | 2      | `src/features/subjects/`                |
+| + New notebook                        | Dialog asking only title + subject                       | disabled (Coming soon) until Module 3                                                  | 3      | `src/app/shell/NewNotebookButton.tsx`   |
+| Settings                              | Go to settings                                           | works                                                                                  | 2      | `src/app/shell/Sidebar.tsx`             |
+| Mobile bottom tabs + floating "+ New" | Home, Whiteboard, Flashcards, Profile; hidden in editors | works (tabs, drawer with full sidebar); "+ New" disabled until Module 3                | 2      | `src/app/shell/MobileBars.tsx`          |
 
 ## Dashboard (`dashboard-desktop-light.png`)
 
-| Element                     | Expected behavior                                             | Status  | Module | Target file               |
-| --------------------------- | ------------------------------------------------------------- | ------- | ------ | ------------------------- |
-| Search field                | Global search over notebooks, PDFs, flashcards                | missing | 2      | `src/features/search/`    |
-| Ask AI                      | Opens the AI panel (server-side AI)                           | missing | 8      | `src/features/ai/`        |
-| Greeting + date + name      | Time-of-day greeting, localized date, user name               | missing | 3      | `src/features/dashboard/` |
-| This week: hours focused    | From real tracked usage                                       | missing | 3      | same                      |
-| Flashcards due + Review now | Real due count; starts review                                 | missing | 3, 7   | same                      |
-| Weekly goal ring + streak   | Computed from real usage                                      | missing | 3      | same                      |
-| Recent notebook cards       | Open notebook; live first-page preview or subject placeholder | missing | 3      | `src/features/notebooks/` |
-| Notebook rename / delete    | Per §9.3 (no menu visible in capture)                         | missing | 3      | same                      |
-| Create notebook card        | Same dialog as "+ New notebook"                               | missing | 3      | same                      |
-| Recent PDFs and books       | Required by §5; not visible in capture (below fold?)          | missing | 3      | same                      |
+| Element                     | Expected behavior                                             | Status                                                                  | Module | Target file                         |
+| --------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------- | ------ | ----------------------------------- |
+| Search field                | Global search over notebooks, PDFs, flashcards                | works (subjects now; notebooks, books, decks as their modules add them) | 2      | `src/features/search/SearchBox.tsx` |
+| Ask AI                      | Opens the AI panel (server-side AI)                           | missing                                                                 | 8      | `src/features/ai/`                  |
+| Greeting + date + name      | Time-of-day greeting, localized date, user name               | missing                                                                 | 3      | `src/features/dashboard/`           |
+| This week: hours focused    | From real tracked usage                                       | missing                                                                 | 3      | same                                |
+| Flashcards due + Review now | Real due count; starts review                                 | missing                                                                 | 3, 7   | same                                |
+| Weekly goal ring + streak   | Computed from real usage                                      | missing                                                                 | 3      | same                                |
+| Recent notebook cards       | Open notebook; live first-page preview or subject placeholder | missing                                                                 | 3      | `src/features/notebooks/`           |
+| Notebook rename / delete    | Per §9.3 (no menu visible in capture)                         | missing                                                                 | 3      | same                                |
+| Create notebook card        | Same dialog as "+ New notebook"                               | missing                                                                 | 3      | same                                |
+| Recent PDFs and books       | Required by §5; not visible in capture (below fold?)          | missing                                                                 | 3      | same                                |
 
 ## Whiteboard (`whiteboard-desktop-light.png`)
 
@@ -89,17 +89,17 @@ Status: works / broken / UI-only / missing / disabled (Coming soon). "Module" re
 
 ## Settings (`settings-desktop-light.png`)
 
-| Element                                                             | Expected behavior                            | Status                                                                         | Module | Target file                        |
-| ------------------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------ | ------ | ---------------------------------- |
-| Theme Light / Dark / Paper                                          | Applies instantly; saved per user            | missing (tokens done)                                                          | 2, 10  | `src/features/settings/`           |
-| Text size S / M / L                                                 | Scales interface text; saved                 | missing (scale done)                                                           | 2, 10  | same                               |
-| Interface language                                                  | Switch locale; saved                         | missing (i18n done)                                                            | 2, 10  | same                               |
-| Whiteboard toolbar side Left / Right                                | Default toolbar dock side                    | missing                                                                        | 10     | same                               |
-| Change photo                                                        | Upload profile photo                         | missing                                                                        | 10     | same                               |
-| Name, Email                                                         | Edit profile; email change with verification | missing                                                                        | 10     | same                               |
-| Change password                                                     | Re-auth + change                             | missing                                                                        | 10     | same                               |
-| Sign out                                                            | Sign out, clear cached data                  | works (Module 1; on the temporary home page, moves into Settings in Module 10) | 1      | `src/features/auth/useSignOut.tsx` |
-| (below fold) Delete account, Data export, sync status, storage used | Per §5                                       | missing                                                                        | 10     | same                               |
+| Element                                                             | Expected behavior                            | Status                                                                         | Module | Target file                              |
+| ------------------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------ | ------ | ---------------------------------------- |
+| Theme Light / Dark / Paper                                          | Applies instantly; saved per user            | works (saved per user)                                                         | 2, 10  | `src/features/settings/SettingsPage.tsx` |
+| Text size S / M / L                                                 | Scales interface text; saved                 | works (saved per user)                                                         | 2, 10  | `src/features/settings/SettingsPage.tsx` |
+| Interface language                                                  | Switch locale; saved                         | works (English is the only language for now)                                   | 2, 10  | `src/features/settings/SettingsPage.tsx` |
+| Whiteboard toolbar side Left / Right                                | Default toolbar dock side                    | works (saved; used by the whiteboard in Module 4)                              | 10     | `src/features/settings/SettingsPage.tsx` |
+| Change photo                                                        | Upload profile photo                         | missing                                                                        | 10     | same                                     |
+| Name, Email                                                         | Edit profile; email change with verification | missing                                                                        | 10     | same                                     |
+| Change password                                                     | Re-auth + change                             | missing                                                                        | 10     | same                                     |
+| Sign out                                                            | Sign out, clear cached data                  | works (Module 1; on the temporary home page, moves into Settings in Module 10) | 1      | `src/features/auth/useSignOut.tsx`       |
+| (below fold) Delete account, Data export, sync status, storage used | Per §5                                       | missing                                                                        | 10     | same                                     |
 
 ## Not in captures but required by CLAUDE.md
 

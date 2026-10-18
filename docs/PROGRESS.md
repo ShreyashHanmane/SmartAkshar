@@ -70,3 +70,30 @@
 - A Google sign-in conflict (the Google account already exists) can't merge guest data. The user sees an explanation instead.
 - The production Firebase project must have the Email/Password, Google and Anonymous providers enabled, plus email enumeration protection. That's a console change for you to make before launch.
 - Guest quotas are enforced where they apply (uploads in Module 6, AI in Module 8).
+
+## Module 2: App shell (branch `feat/shell`)
+
+**Status:** complete.
+
+**Done**
+
+- Sidebar (desktop and tablet) matching the design: wordmark, Dashboard / Whiteboard / Flashcards / Library, SUBJECTS, "+ New notebook", Settings. Active item uses the approved AA-safe `accent-on-soft`.
+- Mobile: top bar (menu drawer with the full sidebar, wordmark, search), bottom tabs Home / Whiteboard / Flashcards / Profile, floating "+ New". Editors will render outside the shell, so the tab bar is hidden there.
+- Subjects: create, rename, recolour (6 AA-checked colours), and delete with confirmation (notebooks and decks in the subject move to "No subject"). Loading skeleton, empty and error states.
+- Global search: ARIA combobox over the user's subjects, notebooks, books and decks (client-side index; diacritic- and case-insensitive; works for any script). Full-page search on mobile.
+- Settings → Appearance: theme, text size, language (English only), whiteboard toolbar side. Changes apply instantly, are saved per user in Firestore, and are cached locally so the next load paints in the right theme. A toast confirms each save.
+- Account card with Sign out (moved from the temporary home page).
+- Shared UI: Toast, Menu (WAI-ARIA keyboard pattern), Segmented (radio group).
+- Firestore rules rewritten without the recursive wildcard: validated profile `settings` and `subjects` (field whitelist, enums, 40-character names, server timestamps, fixed `createdAt`). Read-only access to notebooks, decks and books until their modules add write rules.
+
+**Decisions**
+
+- Subject colours are a named palette (blue, purple, teal, orange, green, rose) instead of fixed subjects. New users start with no subjects; there's no demo data.
+- Writes don't wait for the server to confirm. Firestore applies them locally at once, so dialogs close immediately, even offline. Server rejections show an error toast.
+- "+ New notebook" is disabled with a "Coming soon" tooltip until Module 3.
+- `/notebooks`, `/flashcards` and `/library` show an honest "coming soon" page until their modules land.
+
+**Open issues**
+
+- Subject counts and the flashcards due badge arrive with notebooks (Module 3) and decks (Module 7).
+- Deleting a subject while offline fails with an error toast (it has to query notebooks and decks first). Module 11 revisits this with offline persistence.
