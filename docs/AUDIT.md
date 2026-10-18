@@ -103,7 +103,7 @@ Status: works / broken / UI-only / missing / disabled (Coming soon). "Module" re
 
 ## Not in captures but required by CLAUDE.md
 
-- **Auth screens: works (Module 1).** Login, sign up, forgot password, verify email, Google, guest, guest upgrade, protected routes, session persistence. Covered by `tests/e2e/auth.spec.ts`. There is no design capture for these yet; they use the same tokens and card style as the approved screens.
+- **Auth screens: works.** Local accounts: sign up (name, username, password), login, sign-out, protected routes, session persistence, "Forgot password?" with the local reset command, and a server-unreachable screen. Google sign-in, guest mode and email verification were removed by the local-only decision (2026-10-18).
 - **Notes editor:** Tiptap.
 - **AI side panel / bottom sheet.**
 - **Exports:** whiteboard PDF/PNG, notes PDF/DOCX, ZIP.

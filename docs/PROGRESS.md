@@ -182,3 +182,21 @@
 
 - Notes → PDF / DOCX export arrives with Module 9 (menu items disabled with "Coming soon").
 - Total per-user storage quotas (200 MB / guests 25 MB) can't be enforced in Storage rules alone. Planned with the Cloud Functions work (Modules 8 and 12); per-file limits are enforced now.
+
+## Backend switch: local-only (branch `feat/local-backend`)
+
+**Decision (user, 2026-10-18):** drop Firebase and every third-party service for data and sign-in. Everything runs locally and is stored in a folder. Local username + password accounts (no Google, no guest mode, no email verification; `npm run reset-password` instead). AI stays optional via Gemini from the local server (Module 8). This overrides CLAUDE.md §2 and §7, which were updated.
+
+**Done**
+
+- `server/`: Node built-ins only (+ zod): SQLite schema and migrations, scrypt accounts, hashed sessions in HttpOnly SameSite=Strict cookies, CSRF header and Origin checks, login rate limits, per-user repositories for every feature, streamed uploads with magic-byte checks and quotas, owner-only file serving, live updates over SSE, security headers, static serving of the built app, bound to 127.0.0.1.
+- `src/shared/`: schemas, file-type and image checks, and note cleaning, shared by browser and server.
+- `src/data/` rewritten against the API with the same function names, so the screens are unchanged. Auth screens simplified to username + password; "Forgot password?" explains the local reset command.
+- Saves treat "server unreachable" as pending, never failed: the Saved chip shows "Server unreachable · not saved yet" and retries every 3 s. If the server isn't running at all, the app shows a "Can't reach the AKSHAR server" screen with the start command.
+- Removed: `firebase`, `firebase-tools`, `@firebase/rules-unit-testing` (691 packages), `firebase.json`, the rules files, the rules tests and the emulator caches. `npm audit`: 16 findings → **0 vulnerabilities**. Added `@types/node` 26.6.3 (dev, type-only; approved).
+- Tests: 14 server API tests replace the rules tests, covering accounts, authorization (including negative cases), CSRF, rate limits, validation, server-side note cleaning, uploads, account deletion and live updates. All e2e tests run against the real server.
+
+**Notes**
+
+- Edits made while the server is unreachable are kept in memory and retried. Closing the tab before the server is back loses them; the browser warns before closing. Module 11 can add an on-device outbox.
+- The parked reader work (Module 6) is on `feat/reader` (WIP commit) and continues on this backend next.
