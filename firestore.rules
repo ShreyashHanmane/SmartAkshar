@@ -1,0 +1,15 @@
+rules_version = '2';
+
+// Default-deny. Each student can only reach documents under their own uid.
+// Per-collection shape and size validation is added with each feature module.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    match /users/{uid}/{document=**} {
+      allow read, write: if isOwner(uid);
+    }
+  }
+}

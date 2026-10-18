@@ -1,0 +1,12 @@
+rules_version = '2';
+
+// Default-deny. Owners may read their own files. Uploads stay closed until the
+// reader module defines allowed types and maximum sizes (open item in CLAUDE.md §12).
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /users/{uid}/{allPaths=**} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+  }
+}
