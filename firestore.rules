@@ -89,6 +89,16 @@ service cloud.firestore {
           allow read, delete: if isOwner(uid);
           allow create, update: if isOwner(uid) && pageId.matches('^[A-Za-z0-9_-]{1,40}$') && validPage(request.resource.data);
         }
+
+        // One typed note per notebook (Tiptap JSON, cleaned by the app on load and save).
+        match /notes/{noteId} {
+          allow read, delete: if isOwner(uid);
+          allow create, update: if isOwner(uid)
+            && noteId == 'main'
+            && request.resource.data.keys().hasOnly(['content', 'updatedAt'])
+            && request.resource.data.content is map
+            && stampedNow(request.resource.data);
+        }
       }
 
       match /activity/{day} {

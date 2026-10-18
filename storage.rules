@@ -1,12 +1,34 @@
 rules_version = '2';
 
-// Default-deny. Owners may read their own files. Uploads stay closed until the
-// reader module defines allowed types and maximum sizes (open item in CLAUDE.md §12).
+// Default-deny. Everything lives under users/{uid}/ and only the owner can
+// reach it. Uploads are validated here as well as in the app: random object
+// names, allowed content types, and size limits (guests get smaller limits).
 service firebase.storage {
   match /b/{bucket}/o {
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function isGuest() {
+      return request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    // Note images: 5 MB for accounts, 2 MB for guests. Never overwritten in place.
+    match /users/{uid}/notes/{notebookId}/{file} {
+      allow read, delete: if isOwner(uid);
+      allow create: if isOwner(uid)
+        && resource == null
+        && notebookId.matches('^[A-Za-z0-9]{1,40}$')
+        && file.matches('^[0-9a-f]{32}[.](png|jpg|gif|webp)$')
+        && request.resource.contentType.matches('image/(png|jpeg|gif|webp)')
+        && request.resource.size > 0
+        && request.resource.size <= (isGuest() ? 2 * 1024 * 1024 : 5 * 1024 * 1024);
+    }
+
+    // Anything else under the user's folder: readable by the owner, not writable
+    // until a module defines its upload rules.
     match /users/{uid}/{allPaths=**} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow write: if false;
+      allow read: if isOwner(uid);
     }
   }
 }

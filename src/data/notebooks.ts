@@ -15,6 +15,7 @@ import { z } from 'zod';
 import type { Element } from '../features/whiteboard/model';
 import { PAPER_BACKGROUNDS, PAPER_STYLES } from '../features/whiteboard/paper';
 import { parseElements } from './elements';
+import { deleteObject, listAll, ref as storageRef } from 'firebase/storage';
 import { getFirebase } from './firebase';
 import { LIMITS } from './models';
 
@@ -127,7 +128,7 @@ export function updateNotebook(
   return updateDoc(doc(notebooksCol(uid), id), { ...patch, updatedAt: serverTimestamp() });
 }
 
-/** Deletes every page, then the notebook. */
+/** Deletes every page, the typed note and its images, then the notebook. */
 export async function deleteNotebook(uid: string, id: string): Promise<void> {
   const { db } = getFirebase();
   const ref = doc(notebooksCol(uid), id);
@@ -137,6 +138,11 @@ export async function deleteNotebook(uid: string, id: string): Promise<void> {
     for (const page of pages.docs.slice(i, i + 450)) batch.delete(page.ref);
     await batch.commit();
   }
+  await deleteDoc(doc(ref, 'notes', 'main'));
+  // Note images live in Storage; remove them too (best effort: the notebook is already gone).
+  const { storage } = getFirebase();
+  const images = await listAll(storageRef(storage, `users/${uid}/notes/${id}`)).catch(() => null);
+  await Promise.all((images?.items ?? []).map((item) => deleteObject(item).catch(() => undefined)));
   await deleteDoc(ref);
 }
 

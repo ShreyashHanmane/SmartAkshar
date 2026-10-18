@@ -16,7 +16,7 @@ import {
   updateDoc,
   writeBatch,
 } from 'firebase/firestore';
-import { getBytes, ref, uploadString } from 'firebase/storage';
+import { deleteObject, getBytes, ref, uploadBytes, uploadString } from 'firebase/storage';
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 
 let env: RulesTestEnvironment;
@@ -245,20 +245,109 @@ describe('everything else', () => {
   });
 });
 
+describe('notes', () => {
+  it('allows only the main note with content and a server timestamp', async () => {
+    const db = alice();
+    await assertSucceeds(
+      setDoc(doc(db, 'users/alice/notebooks/n1/notes/main'), {
+        content: { type: 'doc' },
+        updatedAt: serverTimestamp(),
+      }),
+    );
+    await assertFails(
+      setDoc(doc(db, 'users/alice/notebooks/n1/notes/other'), { content: {}, updatedAt: serverTimestamp() }),
+    );
+    await assertFails(
+      setDoc(doc(db, 'users/alice/notebooks/n1/notes/main'), {
+        content: 'html',
+        updatedAt: serverTimestamp(),
+      }),
+    );
+    await assertFails(
+      setDoc(doc(db, 'users/alice/notebooks/n1/notes/main'), {
+        content: {},
+        html: '<b>',
+        updatedAt: serverTimestamp(),
+      }),
+    );
+    await assertFails(getDoc(doc(bob(), 'users/alice/notebooks/n1/notes/main')));
+  });
+});
+
+const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const name = 'a'.repeat(32);
+
 describe('storage rules', () => {
-  it('blocks all uploads until upload limits are defined', async () => {
-    const storage = env.authenticatedContext('alice').storage();
-    await assertFails(uploadString(ref(storage, 'users/alice/books/a.txt'), 'hello'));
+  it('lets the owner upload valid note images within limits', async () => {
+    const storage = env
+      .authenticatedContext('alice', { firebase: { sign_in_provider: 'password' } })
+      .storage();
+    await assertSucceeds(
+      uploadBytes(ref(storage, `users/alice/notes/n1/${name}.png`), png, { contentType: 'image/png' }),
+    );
+    await assertSucceeds(getBytes(ref(storage, `users/alice/notes/n1/${name}.png`)));
+    await assertSucceeds(deleteObject(ref(storage, `users/alice/notes/n1/${name}.png`)));
   });
 
-  it('lets the owner read their own files but nobody else', async () => {
+  it('rejects wrong types, names, sizes, overwrites, and other users', async () => {
+    const storage = env
+      .authenticatedContext('alice', { firebase: { sign_in_provider: 'password' } })
+      .storage();
+    await assertFails(
+      uploadBytes(ref(storage, `users/alice/notes/n1/${name}.svg`), png, { contentType: 'image/svg+xml' }),
+    );
+    await assertFails(
+      uploadBytes(ref(storage, `users/alice/notes/n1/${name}.png`), png, { contentType: 'text/html' }),
+    );
+    await assertFails(
+      uploadBytes(ref(storage, 'users/alice/notes/n1/my photo.png'), png, { contentType: 'image/png' }),
+    );
+    await assertFails(
+      uploadBytes(ref(storage, `users/alice/notes/n1/${name}.png`), new Uint8Array(5 * 1024 * 1024 + 1), {
+        contentType: 'image/png',
+      }),
+    );
+    await assertSucceeds(
+      uploadBytes(ref(storage, `users/alice/notes/n1/${'b'.repeat(32)}.png`), png, {
+        contentType: 'image/png',
+      }),
+    );
+    await assertFails(
+      uploadBytes(ref(storage, `users/alice/notes/n1/${'b'.repeat(32)}.png`), png, {
+        contentType: 'image/png',
+      }),
+    );
+    const bobStorage = env.authenticatedContext('bob').storage();
+    await assertFails(
+      uploadBytes(ref(bobStorage, `users/alice/notes/n1/${'c'.repeat(32)}.png`), png, {
+        contentType: 'image/png',
+      }),
+    );
+    await assertFails(getBytes(ref(bobStorage, `users/alice/notes/n1/${'b'.repeat(32)}.png`)));
+    await assertFails(
+      getBytes(ref(env.unauthenticatedContext().storage(), `users/alice/notes/n1/${'b'.repeat(32)}.png`)),
+    );
+  });
+
+  it('gives guests a smaller image limit', async () => {
+    const guest = env.authenticatedContext('gina', { firebase: { sign_in_provider: 'anonymous' } }).storage();
+    await assertFails(
+      uploadBytes(ref(guest, `users/gina/notes/n1/${name}.png`), new Uint8Array(2 * 1024 * 1024 + 1), {
+        contentType: 'image/png',
+      }),
+    );
+    await assertSucceeds(
+      uploadBytes(ref(guest, `users/gina/notes/n1/${name}.png`), png, { contentType: 'image/png' }),
+    );
+  });
+
+  it('keeps other folders read-only for the owner', async () => {
+    const storage = env.authenticatedContext('alice').storage();
+    await assertFails(uploadString(ref(storage, 'users/alice/books/a.txt'), 'hello'));
     await env.withSecurityRulesDisabled(async (ctx) => {
       await uploadString(ref(ctx.storage(), 'users/alice/books/a.txt'), 'hello');
     });
-    await assertSucceeds(
-      getBytes(ref(env.authenticatedContext('alice').storage(), 'users/alice/books/a.txt')),
-    );
+    await assertSucceeds(getBytes(ref(storage, 'users/alice/books/a.txt')));
     await assertFails(getBytes(ref(env.authenticatedContext('bob').storage(), 'users/alice/books/a.txt')));
-    await assertFails(getBytes(ref(env.unauthenticatedContext().storage(), 'users/alice/books/a.txt')));
   });
 });
