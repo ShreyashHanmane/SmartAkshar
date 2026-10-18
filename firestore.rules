@@ -1,15 +1,76 @@
 rules_version = '2';
 
-// Default-deny. Each student can only reach documents under their own uid.
-// Per-collection shape and size validation is added with each feature module.
+// Default-deny. Each student can only reach documents under their own uid, and
+// every write is validated for shape and size. Collections are listed
+// explicitly (no recursive wildcard), because allow rules are OR-ed and a
+// wildcard would bypass per-collection validation.
 service cloud.firestore {
   match /databases/{database}/documents {
     function isOwner(uid) {
       return request.auth != null && request.auth.uid == uid;
     }
 
-    match /users/{uid}/{document=**} {
-      allow read, write: if isOwner(uid);
+    function isText(value, max) {
+      return value is string && value.size() > 0 && value.size() <= max;
+    }
+
+    function stampedNow(data) {
+      return data.updatedAt == request.time;
+    }
+
+    function createdNow(data) {
+      return data.createdAt == request.time;
+    }
+
+    function createdUnchanged() {
+      return request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    match /users/{uid} {
+      function validSettings(s) {
+        return s is map
+          && s.keys().hasOnly(['theme', 'textSize', 'locale', 'toolbarSide'])
+          && (!('theme' in s) || s.theme in ['light', 'dark', 'paper'])
+          && (!('textSize' in s) || s.textSize in ['sm', 'md', 'lg'])
+          && (!('locale' in s) || s.locale in ['en'])
+          && (!('toolbarSide' in s) || s.toolbarSide in ['left', 'right']);
+      }
+
+      function validProfile(d) {
+        return d.keys().hasOnly(['settings', 'updatedAt'])
+          && (!('settings' in d) || validSettings(d.settings))
+          && stampedNow(d);
+      }
+
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && validProfile(request.resource.data);
+
+      match /subjects/{subjectId} {
+        function validSubject(d) {
+          return d.keys().hasOnly(['name', 'color', 'createdAt', 'updatedAt'])
+            && d.keys().hasAll(['name', 'color', 'createdAt', 'updatedAt'])
+            && isText(d.name, 40)
+            && d.color in ['blue', 'purple', 'teal', 'orange', 'green', 'rose']
+            && stampedNow(d);
+        }
+
+        allow read, delete: if isOwner(uid);
+        allow create: if isOwner(uid) && validSubject(request.resource.data) && createdNow(request.resource.data);
+        allow update: if isOwner(uid) && validSubject(request.resource.data) && createdUnchanged();
+      }
+
+      // Written by later modules; readable now so subject cleanup can query them.
+      match /notebooks/{notebookId} {
+        allow read: if isOwner(uid);
+      }
+
+      match /decks/{deckId} {
+        allow read: if isOwner(uid);
+      }
+
+      match /books/{bookId} {
+        allow read: if isOwner(uid);
+      }
     }
   }
 }
