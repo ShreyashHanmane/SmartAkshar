@@ -6,6 +6,7 @@ import { randomBytes } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { z } from 'zod';
 import { cleanContent } from '../src/shared/clean.ts';
+import { nextSchedule } from '../src/shared/leitner.ts';
 import {
   BOOK_MAX_BYTES,
   BOOK_MIME,
@@ -21,6 +22,10 @@ import {
   PAGE_MAX_BYTES,
   activityInputSchema,
   bookPatchSchema,
+  cardInputSchema,
+  cardPatchSchema,
+  deckInputSchema,
+  reviewInputSchema,
   highlightInputSchema,
   loginSchema,
   notebookCreateSchema,
@@ -258,13 +263,14 @@ route('DELETE', '/api/subjects/:id', (ctx) => {
   const uid = requireUser(ctx.db, ctx.req);
   const id = ctx.params.id ?? '';
   tx(ctx.db, () => {
-    // Notebooks in the subject are kept and become "No subject".
-    ctx.db
-      .prepare('UPDATE notebooks SET subject_id = NULL WHERE user_id = ? AND subject_id = ?')
-      .run(uid, id);
+    // Notebooks and decks in the subject are kept and become "No subject".
+    for (const table of ['notebooks', 'decks'])
+      ctx.db
+        .prepare(`UPDATE ${table} SET subject_id = NULL WHERE user_id = ? AND subject_id = ?`)
+        .run(uid, id);
     ctx.db.prepare('DELETE FROM subjects WHERE user_id = ? AND id = ?').run(uid, id);
   });
-  ctx.hub.publish(uid, 'subjects', 'notebooks');
+  ctx.hub.publish(uid, 'subjects', 'notebooks', 'decks');
   noContent(ctx.res);
 });
 
@@ -383,13 +389,18 @@ route('GET', '/api/notebooks/:id/pages', (ctx) => {
   const first = ctx.query.get('first') === '1';
   const rows = ctx.db
     .prepare(
-      `SELECT id, idx AS "index", elements FROM pages WHERE user_id = ? AND notebook_id = ? ORDER BY idx${first ? ' LIMIT 1' : ''}`,
+      `SELECT id, idx AS "index", elements, updated_at AS updatedAt FROM pages WHERE user_id = ? AND notebook_id = ? ORDER BY idx${first ? ' LIMIT 1' : ''}`,
     )
-    .all(uid, id) as { id: string; index: number; elements: string }[];
+    .all(uid, id) as { id: string; index: number; elements: string; updatedAt: number }[];
   sendJson(
     ctx.res,
     200,
-    rows.map((r) => ({ id: r.id, index: r.index, elements: JSON.parse(r.elements) as unknown })),
+    rows.map((r) => ({
+      id: r.id,
+      index: r.index,
+      elements: JSON.parse(r.elements) as unknown,
+      updatedAt: r.updatedAt,
+    })),
   );
 });
 
@@ -400,6 +411,7 @@ route('PUT', '/api/notebooks/:id/pages/:pageId', async (ctx) => {
   const body = await readJson(ctx.req, pageInputSchema, 2 * 1024 * 1024);
   const json = JSON.stringify(body.elements);
   if (Buffer.byteLength(json) > PAGE_MAX_BYTES) throw new HttpError(413, 'page-full');
+  const savedAt = now();
   tx(ctx.db, () => {
     requireNotebook(ctx.db, uid, id);
     ctx.db
@@ -407,11 +419,12 @@ route('PUT', '/api/notebooks/:id/pages/:pageId', async (ctx) => {
         `INSERT INTO pages (user_id, notebook_id, id, idx, elements, updated_at) VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT(user_id, notebook_id, id) DO UPDATE SET idx = excluded.idx, elements = excluded.elements, updated_at = excluded.updated_at`,
       )
-      .run(uid, id, ctx.params.pageId ?? '', body.index, json, now());
+      .run(uid, id, ctx.params.pageId ?? '', body.index, json, savedAt);
     touchNotebook(ctx.db, uid, id);
   });
   ctx.hub.publish(uid, `pages:${id}`, 'notebooks');
-  noContent(ctx.res);
+  // The client ignores fetched copies older than this (stale refetch protection).
+  sendJson(ctx.res, 200, { updatedAt: savedAt });
 });
 
 /** Replaces every page at once (Paged <-> Infinite switch), atomically. */
@@ -441,9 +454,12 @@ route('GET', '/api/notebooks/:id/note', (ctx) => {
   const id = ctx.params.id ?? '';
   requireNotebook(ctx.db, uid, id);
   const row = ctx.db
-    .prepare('SELECT content FROM notes WHERE user_id = ? AND notebook_id = ?')
-    .get(uid, id) as { content: string } | undefined;
-  sendJson(ctx.res, 200, { content: row ? (JSON.parse(row.content) as unknown) : null });
+    .prepare('SELECT content, updated_at AS updatedAt FROM notes WHERE user_id = ? AND notebook_id = ?')
+    .get(uid, id) as { content: string; updatedAt: number } | undefined;
+  sendJson(ctx.res, 200, {
+    content: row ? (JSON.parse(row.content) as unknown) : null,
+    updatedAt: row?.updatedAt ?? 0,
+  });
 });
 
 route('PUT', '/api/notebooks/:id/note', async (ctx) => {
@@ -458,15 +474,16 @@ route('PUT', '/api/notebooks/:id/note', async (ctx) => {
   const json = JSON.stringify(cleanContent(body.content));
   if (Buffer.byteLength(json) > PAGE_MAX_BYTES) throw new HttpError(413, 'note-too-large');
   requireNotebook(ctx.db, uid, id);
+  const savedAt = now();
   ctx.db
     .prepare(
       `INSERT INTO notes (user_id, notebook_id, content, updated_at) VALUES (?, ?, ?, ?)
        ON CONFLICT(user_id, notebook_id) DO UPDATE SET content = excluded.content, updated_at = excluded.updated_at`,
     )
-    .run(uid, id, json, now());
-  ctx.db.prepare('UPDATE notebooks SET updated_at = ? WHERE user_id = ? AND id = ?').run(now(), uid, id);
+    .run(uid, id, json, savedAt);
+  ctx.db.prepare('UPDATE notebooks SET updated_at = ? WHERE user_id = ? AND id = ?').run(savedAt, uid, id);
   ctx.hub.publish(uid, `note:${id}`, 'notebooks');
-  noContent(ctx.res);
+  sendJson(ctx.res, 200, { updatedAt: savedAt });
 });
 
 // --- uploaded files ----------------------------------------------------------
@@ -596,6 +613,205 @@ route('GET', '/api/cards/due-count', (ctx) => {
   sendJson(ctx.res, 200, { count: n });
 });
 
+// --- flashcards ----------------------------------------------------------------
+
+/** "Due" boundary from the client (end of its local day), within sane bounds. */
+function dueBefore(ctx: Ctx): number {
+  const v = Number(ctx.query.get('before') ?? now());
+  if (!Number.isFinite(v) || v < 0 || v > now() + 2 * 86_400_000) throw new HttpError(400, 'invalid');
+  return v;
+}
+
+function requireDeck(db: Db, uid: string, id: string) {
+  if (!db.prepare('SELECT 1 FROM decks WHERE user_id = ? AND id = ?').get(uid, id))
+    throw new HttpError(404, 'not-found');
+}
+
+const cardCols = 'id, deck_id AS deckId, front, back, box, due';
+
+route('GET', '/api/decks', (ctx) => {
+  const uid = requireUser(ctx.db, ctx.req);
+  const before = dueBefore(ctx);
+  const rows = ctx.db
+    .prepare(
+      `SELECT d.id, d.title, d.subject_id AS subjectId,
+              COUNT(c.id) AS total,
+              COALESCE(SUM(c.due <= ?), 0) AS due,
+              COALESCE(SUM(c.box >= 4), 0) AS learned
+       FROM decks d LEFT JOIN cards c ON c.user_id = d.user_id AND c.deck_id = d.id
+       WHERE d.user_id = ? GROUP BY d.id ORDER BY d.created_at`,
+    )
+    .all(before, uid);
+  sendJson(ctx.res, 200, rows);
+});
+
+route('POST', '/api/decks', async (ctx) => {
+  const uid = requireUser(ctx.db, ctx.req);
+  const body = await readJson(ctx.req, deckInputSchema);
+  const id = newId();
+  ctx.db
+    .prepare(
+      'INSERT INTO decks (user_id, id, title, subject_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+    )
+    .run(uid, id, body.title, body.subjectId, now(), now());
+  ctx.hub.publish(uid, 'decks');
+  sendJson(ctx.res, 201, { id });
+});
+
+route('PATCH', '/api/decks/:id', async (ctx) => {
+  const uid = requireUser(ctx.db, ctx.req);
+  const id = ctx.params.id ?? '';
+  const body = await readJson(ctx.req, deckInputSchema.partial());
+  requireDeck(ctx.db, uid, id);
+  if (body.title !== undefined)
+    ctx.db
+      .prepare('UPDATE decks SET title = ?, updated_at = ? WHERE user_id = ? AND id = ?')
+      .run(body.title, now(), uid, id);
+  if (body.subjectId !== undefined)
+    ctx.db
+      .prepare('UPDATE decks SET subject_id = ?, updated_at = ? WHERE user_id = ? AND id = ?')
+      .run(body.subjectId, now(), uid, id);
+  ctx.hub.publish(uid, 'decks');
+  noContent(ctx.res);
+});
+
+route('DELETE', '/api/decks/:id', (ctx) => {
+  const uid = requireUser(ctx.db, ctx.req);
+  const id = ctx.params.id ?? '';
+  tx(ctx.db, () => {
+    ctx.db.prepare('DELETE FROM cards WHERE user_id = ? AND deck_id = ?').run(uid, id);
+    ctx.db.prepare('DELETE FROM decks WHERE user_id = ? AND id = ?').run(uid, id);
+  });
+  ctx.hub.publish(uid, 'decks', 'cards', `cards:${id}`);
+  noContent(ctx.res);
+});
+
+route('GET', '/api/decks/:id/cards', (ctx) => {
+  const uid = requireUser(ctx.db, ctx.req);
+  const id = ctx.params.id ?? '';
+  requireDeck(ctx.db, uid, id);
+  sendJson(
+    ctx.res,
+    200,
+    ctx.db
+      .prepare(`SELECT ${cardCols} FROM cards WHERE user_id = ? AND deck_id = ? ORDER BY created_at`)
+      .all(uid, id),
+  );
+});
+
+route('POST', '/api/decks/:id/cards', async (ctx) => {
+  const uid = requireUser(ctx.db, ctx.req);
+  const id = ctx.params.id ?? '';
+  const body = await readJson(ctx.req, cardInputSchema, 16 * 1024);
+  requireDeck(ctx.db, uid, id);
+  const count = (
+    ctx.db.prepare('SELECT COUNT(*) AS n FROM cards WHERE user_id = ?').get(uid) as { n: number }
+  ).n;
+  if (count >= 20_000) throw new HttpError(409, 'limit');
+  const cid = newId();
+  ctx.db
+    .prepare(
+      'INSERT INTO cards (user_id, id, deck_id, front, back, box, due, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)',
+    )
+    .run(uid, cid, id, body.front, body.back, now(), now(), now());
+  ctx.hub.publish(uid, 'decks', 'cards', `cards:${id}`);
+  sendJson(ctx.res, 201, { id: cid });
+});
+
+function requireCard(db: Db, uid: string, id: string) {
+  const row = db
+    .prepare('SELECT deck_id AS deckId, box FROM cards WHERE user_id = ? AND id = ?')
+    .get(uid, id) as { deckId: string; box: number } | undefined;
+  if (!row) throw new HttpError(404, 'not-found');
+  return row;
+}
+
+route('PATCH', '/api/cards/:id', async (ctx) => {
+  const uid = requireUser(ctx.db, ctx.req);
+  const id = ctx.params.id ?? '';
+  const body = await readJson(ctx.req, cardPatchSchema, 16 * 1024);
+  const card = requireCard(ctx.db, uid, id);
+  if (body.deckId !== undefined) requireDeck(ctx.db, uid, body.deckId);
+  ctx.db
+    .prepare(
+      'UPDATE cards SET front = COALESCE(?, front), back = COALESCE(?, back), deck_id = COALESCE(?, deck_id), updated_at = ? WHERE user_id = ? AND id = ?',
+    )
+    .run(body.front ?? null, body.back ?? null, body.deckId ?? null, now(), uid, id);
+  ctx.hub.publish(
+    uid,
+    'decks',
+    'cards',
+    `cards:${card.deckId}`,
+    ...(body.deckId ? [`cards:${body.deckId}`] : []),
+  );
+  noContent(ctx.res);
+});
+
+route('DELETE', '/api/cards/:id', (ctx) => {
+  const uid = requireUser(ctx.db, ctx.req);
+  const id = ctx.params.id ?? '';
+  const card = requireCard(ctx.db, uid, id);
+  ctx.db.prepare('DELETE FROM cards WHERE user_id = ? AND id = ?').run(uid, id);
+  ctx.hub.publish(uid, 'decks', 'cards', `cards:${card.deckId}`);
+  noContent(ctx.res);
+});
+
+/** Records a review; the server computes the next box and due date (Leitner). */
+route('POST', '/api/cards/:id/review', async (ctx) => {
+  const uid = requireUser(ctx.db, ctx.req);
+  const id = ctx.params.id ?? '';
+  const body = await readJson(ctx.req, reviewInputSchema);
+  const card = requireCard(ctx.db, uid, id);
+  const next = nextSchedule(card.box, body.result, now());
+  ctx.db
+    .prepare(
+      `UPDATE cards SET box = ?, due = ?, reviews = reviews + 1, lapses = lapses + ?, last_reviewed = ?, updated_at = ?
+       WHERE user_id = ? AND id = ?`,
+    )
+    .run(next.box, next.due, body.result === 'again' ? 1 : 0, now(), now(), uid, id);
+  ctx.hub.publish(uid, 'decks', 'cards', `cards:${card.deckId}`);
+  sendJson(ctx.res, 200, next);
+});
+
+/** Cards due by `before`, optionally in one deck (oldest due first). */
+route('GET', '/api/cards/due', (ctx) => {
+  const uid = requireUser(ctx.db, ctx.req);
+  const before = dueBefore(ctx);
+  const deck = ctx.query.get('deck');
+  const rows = deck
+    ? ctx.db
+        .prepare(
+          `SELECT ${cardCols} FROM cards WHERE user_id = ? AND deck_id = ? AND due <= ? ORDER BY due LIMIT 500`,
+        )
+        .all(uid, deck, before)
+    : ctx.db
+        .prepare(`SELECT ${cardCols} FROM cards WHERE user_id = ? AND due <= ? ORDER BY due LIMIT 500`)
+        .all(uid, before);
+  sendJson(ctx.res, 200, rows);
+});
+
+route('GET', '/api/flashcards/stats', (ctx) => {
+  const uid = requireUser(ctx.db, ctx.req);
+  const before = dueBefore(ctx);
+  const since = Number(ctx.query.get('since') ?? 0);
+  if (!Number.isFinite(since)) throw new HttpError(400, 'invalid');
+  const row = ctx.db
+    .prepare(
+      `SELECT COUNT(*) AS total, COALESCE(SUM(due <= ?), 0) AS dueToday, COALESCE(SUM(last_reviewed >= ?), 0) AS reviewedToday
+       FROM cards WHERE user_id = ?`,
+    )
+    .get(before, since, uid) as { total: number; dueToday: number; reviewedToday: number };
+  const boxes = [1, 2, 3, 4, 5].map(
+    (b) =>
+      (
+        ctx.db.prepare('SELECT COUNT(*) AS n FROM cards WHERE user_id = ? AND box = ?').get(uid, b) as {
+          n: number;
+        }
+      ).n,
+  );
+  sendJson(ctx.res, 200, { ...row, boxes });
+});
+
 route('GET', '/api/search-index', (ctx) => {
   const uid = requireUser(ctx.db, ctx.req);
   const subjects = ctx.db.prepare('SELECT id, name FROM subjects WHERE user_id = ?').all(uid);
@@ -603,7 +819,8 @@ route('GET', '/api/search-index', (ctx) => {
     .prepare('SELECT id, title, subject_id AS subjectId FROM notebooks WHERE user_id = ? LIMIT 1000')
     .all(uid);
   const books = ctx.db.prepare('SELECT id, title, author FROM books WHERE user_id = ? LIMIT 1000').all(uid);
-  sendJson(ctx.res, 200, { subjects, notebooks, books, decks: [] });
+  const decks = ctx.db.prepare('SELECT id, title FROM decks WHERE user_id = ? LIMIT 1000').all(uid);
+  sendJson(ctx.res, 200, { subjects, notebooks, books, decks });
 });
 
 // --- books -------------------------------------------------------------------

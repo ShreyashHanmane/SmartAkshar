@@ -115,6 +115,28 @@ const MIGRATIONS: string[] = [
     PRIMARY KEY (user_id, id)
   );
   `,
+  // v2: flashcard decks and full card fields.
+  `
+  CREATE TABLE decks (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    subject_id TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, id)
+  );
+  ALTER TABLE cards ADD COLUMN front TEXT NOT NULL DEFAULT '';
+  ALTER TABLE cards ADD COLUMN back TEXT NOT NULL DEFAULT '';
+  ALTER TABLE cards ADD COLUMN box INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE cards ADD COLUMN reviews INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE cards ADD COLUMN lapses INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE cards ADD COLUMN last_reviewed INTEGER;
+  ALTER TABLE cards ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE cards ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0;
+  CREATE INDEX cards_deck ON cards(user_id, deck_id);
+  CREATE INDEX cards_due ON cards(user_id, due);
+  `,
 ];
 
 export type Db = DatabaseSync;

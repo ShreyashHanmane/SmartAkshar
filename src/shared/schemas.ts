@@ -197,3 +197,41 @@ export const highlightInputSchema = z
     suffix: z.string().max(64),
   })
   .strict();
+
+// --- flashcards ------------------------------------------------------------
+export const CARD_TEXT_MAX = 2000;
+export const deckInputSchema = z
+  .object({ title: z.string().trim().min(1).max(LIMITS.title), subjectId: idSchema.nullable() })
+  .strict();
+export const deckSchema = z.object({
+  id: idSchema,
+  title: z.string(),
+  subjectId: z.string().nullable(),
+  total: z.number().int(),
+  due: z.number().int(),
+  learned: z.number().int(),
+});
+export type Deck = z.infer<typeof deckSchema>;
+const cardText = z.string().trim().min(1).max(CARD_TEXT_MAX);
+export const cardInputSchema = z.object({ front: cardText, back: cardText }).strict();
+export const cardPatchSchema = z
+  .object({ front: cardText, back: cardText, deckId: idSchema })
+  .partial()
+  .strict();
+export const cardSchema = z.object({
+  id: idSchema,
+  deckId: z.string(),
+  front: z.string(),
+  back: z.string(),
+  box: z.number().int().min(1).max(5).catch(1),
+  due: z.number(),
+});
+export type Card = z.infer<typeof cardSchema>;
+export const reviewInputSchema = z.object({ result: z.enum(['know', 'again']) }).strict();
+export const statsSchema = z.object({
+  total: z.number().int(),
+  dueToday: z.number().int(),
+  reviewedToday: z.number().int(),
+  boxes: z.array(z.number().int()).length(5),
+});
+export type FlashcardStats = z.infer<typeof statsSchema>;

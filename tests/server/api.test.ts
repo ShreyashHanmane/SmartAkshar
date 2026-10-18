@@ -178,7 +178,7 @@ describe('validation', () => {
     expect((await c.json('POST', '/api/activity', { day: '2026-10-18', seconds: 5000 })).status).toBe(400);
     const huge = Array.from({ length: 5 }, (_, i) => ({ ...stroke, id: `s${i}`, pts: 'A'.repeat(199_996) }));
     expect((await c.json('PUT', '/api/notebooks/nb/pages/p0', page(huge))).status).toBe(413);
-    expect((await c.json('PUT', '/api/notebooks/nb/pages/p0', page([stroke]))).status).toBe(204);
+    expect((await c.json('PUT', '/api/notebooks/nb/pages/p0', page([stroke]))).status).toBe(200);
   });
 
   it('cleans notes on the server (no scripts, unsafe links, or foreign images)', async () => {
