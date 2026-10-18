@@ -200,3 +200,25 @@
 
 - Edits made while the server is unreachable are kept in memory and retried. Closing the tab before the server is back loses them; the browser warns before closing. Module 11 can add an on-device outbox.
 - The parked reader work (Module 6) is on `feat/reader` (WIP commit) and continues on this backend next.
+
+## Module 6: Book reader (branch `feat/reader-local`, on the local backend)
+
+**Status:** complete.
+
+**Done**
+
+- **Library:**
+  - Import PDF, EPUB or TXT. The file is checked by content and extension (also re-checked by the server); title, author and page or chapter count are read locally; upload shows progress and can be cancelled.
+  - Filter tabs (All, PDF, EPUB, TXT) and rows as in the design, with a progress bar, Read, Read with notes, and Rename and Delete.
+  - Loading, empty and error states; import is disabled while the server is unreachable.
+- **Reader:**
+  - **PDF:** pdf.js with a selectable text layer. Character maps, standard fonts and WASM decoders are self-hosted under `/pdfjs/`, never from a CDN.
+  - **EPUB:** a hand-written ZIP reader with zip-bomb and path guards. Chapters are sanitised with DOMPurify (no scripts, forms, inline styles or remote URLs; images come only from inside the EPUB as blob URLs) and shown in a sandboxed iframe without `allow-scripts`, with a restrictive CSP.
+  - **TXT:** split into sections.
+  - Page, chapter or part navigation (buttons and arrow keys); position and progress are saved and restored.
+- **Highlights:** text-quote anchors (exact text + prefix/suffix) that survive reflow; saved to the server, redrawn after reload, removable by clicking.
+- **Selection menu:** Highlight works; Create flashcard (Module 7) and Explain / Summarize / Translate (Module 8) are disabled with "Coming soon".
+- **Read with notes:** a split view with a resizable divider (drag or keyboard; ratio remembered) and Book / Notes tabs on mobile. The notes pane embeds the whiteboard of a notebook linked to the book (created on first use as "<title> — Notes").
+- Study time is tracked while reading.
+
+**Tests:** 7 new e2e scenarios on desktop, tablet and mobile (21 runs). They cover import of all three formats with metadata, filtering, rejecting a disguised file, PDF paging and resume, highlight persistence and removal, the EPUB sandbox (script and inline-handler content never runs, no tracker requests, external links stripped), EPUB and TXT highlights, notes linking with saved handwriting, and rename and delete (the file returns 404 afterwards).

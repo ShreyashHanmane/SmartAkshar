@@ -68,24 +68,24 @@ Status: works / broken / UI-only / missing / disabled (Coming soon). "Module" re
 
 ## Library (`library-desktop-light.png`)
 
-| Element                                             | Expected behavior                                          | Status  | Module | Target file             |
-| --------------------------------------------------- | ---------------------------------------------------------- | ------- | ------ | ----------------------- |
-| Import PDF or book                                  | Validated upload (type by content + extension, size limit) | missing | 6      | `src/features/library/` |
-| Filter All / PDF / EPUB / TXT                       | Filter list                                                | missing | 6      | same                    |
-| Row (badge, title, author, pages, opened, progress) | Real metadata and progress                                 | missing | 6      | same                    |
-| Read                                                | Open reader                                                | missing | 6      | `src/features/reader/`  |
-| Read with notes                                     | Open split view                                            | missing | 6      | same                    |
+| Element                                             | Expected behavior                                          | Status                                                                   | Module | Target file                             |
+| --------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------ | ------ | --------------------------------------- |
+| Import PDF or book                                  | Validated upload (type by content + extension, size limit) | works (content-checked, metadata read locally, upload progress + cancel) | 6      | `src/features/library/useImportBook.ts` |
+| Filter All / PDF / EPUB / TXT                       | Filter list                                                | works                                                                    | 6      | `src/features/library/LibraryPage.tsx`  |
+| Row (badge, title, author, pages, opened, progress) | Real metadata and progress                                 | works (real metadata and progress; rename/delete menu)                   | 6      | `src/features/library/LibraryPage.tsx`  |
+| Read                                                | Open reader                                                | works                                                                    | 6      | `src/features/reader/ReaderPage.tsx`    |
+| Read with notes                                     | Open split view                                            | works (split view with linked notebook)                                  | 6      | `src/features/reader/ReaderPage.tsx`    |
 
 ## Reader split view (`reader-split-desktop-light.png`)
 
-| Element             | Expected behavior                                          | Status  | Module  | Target file                        |
-| ------------------- | ---------------------------------------------------------- | ------- | ------- | ---------------------------------- |
-| Back                | Return                                                     | works   | 6       | `src/features/whiteboard/Bars.tsx` |
-| Page X of Y         | Reading position, saved progress                           | missing | 6       | same                               |
-| Text selection menu | Highlight, Create flashcard, Explain, Summarize, Translate | missing | 6, 8    | same                               |
-| Highlights          | Saved and restored                                         | missing | 6       | same                               |
-| Divider             | Resize panes; tabs Book / Notes on mobile                  | missing | 6       | same                               |
-| Notes pane          | Handwritten/typed notes linked to the book                 | missing | 4, 5, 6 | same                               |
+| Element             | Expected behavior                                          | Status                                                                              | Module  | Target file                                |
+| ------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------- | ------------------------------------------ |
+| Back                | Return                                                     | works                                                                               | 6       | `src/features/whiteboard/Bars.tsx`         |
+| Page X of Y         | Reading position, saved progress                           | works (position saved and restored)                                                 | 6       | `src/features/reader/ReaderPage.tsx`       |
+| Text selection menu | Highlight, Create flashcard, Explain, Summarize, Translate | works for Highlight; Create flashcard (Module 7) and AI actions (Module 8) disabled | 6, 8    | `src/features/reader/SelectionPopover.tsx` |
+| Highlights          | Saved and restored                                         | works (saved, restored after reload, removable)                                     | 6       | `src/features/reader/highlightDom.ts`      |
+| Divider             | Resize panes; tabs Book / Notes on mobile                  | works (drag or arrow keys; Book / Notes tabs on mobile)                             | 6       | `src/features/reader/ReaderPage.tsx`       |
+| Notes pane          | Handwritten/typed notes linked to the book                 | works (embedded whiteboard of the linked notebook)                                  | 4, 5, 6 | `src/features/reader/ReaderPage.tsx`       |
 
 ## Settings (`settings-desktop-light.png`)
 
