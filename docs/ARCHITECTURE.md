@@ -36,6 +36,8 @@ design/screens/  Approved screenshots
 
 Feature modules add typed repositories in `src/data/<feature>.ts`.
 
+**Session:** `src/data/auth.ts` wraps Firebase Auth and exposes `SessionUser` (UI code never sees the Firebase `User`). `src/app/session/` holds the provider, the pure guard functions (`guards.ts`, unit-tested), `safeNextPath`, and the guard components used by the router.
+
 ## Security rules
 
 - `firestore.rules`: default-deny. Only `users/{uid}/**` is reachable, and only by that uid.
@@ -65,7 +67,7 @@ npm run format:check      # prettier
 npm run test              # Vitest unit tests
 npm run test:rules        # Firestore/Storage rules tests in the emulator
 npm run test:e2e:install  # one-time: Chromium into node_modules
-npm run test:e2e          # Playwright (builds + previews automatically)
+npm run test:e2e          # Playwright inside the emulators (builds + previews automatically)
 npm run build             # typecheck + production build
 npm run emulators         # start auth/firestore/storage emulators
 ```

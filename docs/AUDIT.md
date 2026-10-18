@@ -89,21 +89,21 @@ Status: works / broken / UI-only / missing / disabled (Coming soon). "Module" re
 
 ## Settings (`settings-desktop-light.png`)
 
-| Element                                                             | Expected behavior                            | Status                | Module | Target file              |
-| ------------------------------------------------------------------- | -------------------------------------------- | --------------------- | ------ | ------------------------ |
-| Theme Light / Dark / Paper                                          | Applies instantly; saved per user            | missing (tokens done) | 2, 10  | `src/features/settings/` |
-| Text size S / M / L                                                 | Scales interface text; saved                 | missing (scale done)  | 2, 10  | same                     |
-| Interface language                                                  | Switch locale; saved                         | missing (i18n done)   | 2, 10  | same                     |
-| Whiteboard toolbar side Left / Right                                | Default toolbar dock side                    | missing               | 10     | same                     |
-| Change photo                                                        | Upload profile photo                         | missing               | 10     | same                     |
-| Name, Email                                                         | Edit profile; email change with verification | missing               | 10     | same                     |
-| Change password                                                     | Re-auth + change                             | missing               | 10     | same                     |
-| Sign out                                                            | Sign out, clear cached data                  | missing               | 1      | same                     |
-| (below fold) Delete account, Data export, sync status, storage used | Per §5                                       | missing               | 10     | same                     |
+| Element                                                             | Expected behavior                            | Status                                                                         | Module | Target file                        |
+| ------------------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------ | ------ | ---------------------------------- |
+| Theme Light / Dark / Paper                                          | Applies instantly; saved per user            | missing (tokens done)                                                          | 2, 10  | `src/features/settings/`           |
+| Text size S / M / L                                                 | Scales interface text; saved                 | missing (scale done)                                                           | 2, 10  | same                               |
+| Interface language                                                  | Switch locale; saved                         | missing (i18n done)                                                            | 2, 10  | same                               |
+| Whiteboard toolbar side Left / Right                                | Default toolbar dock side                    | missing                                                                        | 10     | same                               |
+| Change photo                                                        | Upload profile photo                         | missing                                                                        | 10     | same                               |
+| Name, Email                                                         | Edit profile; email change with verification | missing                                                                        | 10     | same                               |
+| Change password                                                     | Re-auth + change                             | missing                                                                        | 10     | same                               |
+| Sign out                                                            | Sign out, clear cached data                  | works (Module 1; on the temporary home page, moves into Settings in Module 10) | 1      | `src/features/auth/useSignOut.tsx` |
+| (below fold) Delete account, Data export, sync status, storage used | Per §5                                       | missing                                                                        | 10     | same                               |
 
 ## Not in captures but required by CLAUDE.md
 
-- **Auth screens:** login, sign up, forgot password, verify email, Google, guest.
+- **Auth screens: works (Module 1).** Login, sign up, forgot password, verify email, Google, guest, guest upgrade, protected routes, session persistence. Covered by `tests/e2e/auth.spec.ts`. There is no design capture for these yet; they use the same tokens and card style as the approved screens.
 - **Notes editor:** Tiptap.
 - **AI side panel / bottom sheet.**
 - **Exports:** whiteboard PDF/PNG, notes PDF/DOCX, ZIP.
