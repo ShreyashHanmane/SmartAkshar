@@ -2,6 +2,9 @@ import '@fontsource/noto-sans/400.css';
 import '@fontsource/noto-sans/500.css';
 import '@fontsource/noto-sans/600.css';
 import '@fontsource/noto-sans/700.css';
+// Whiteboard text fonts; files download only when text uses them.
+import '@fontsource/noto-serif/400.css';
+import '@fontsource/caveat/400.css';
 import './index.css';
 
 import { StrictMode } from 'react';
