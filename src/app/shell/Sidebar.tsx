@@ -1,4 +1,6 @@
 import { NavLink } from 'react-router-dom';
+import { subscribeDueCount } from '../../data/cards';
+import { useLive } from '../../data/useLive';
 import { t } from '../../i18n/i18n';
 import { Icon } from '../../ui/Icon';
 import { Wordmark } from '../../ui/Wordmark';
@@ -7,7 +9,15 @@ import { SubjectsNav } from '../../features/subjects/SubjectsNav';
 import { NewNotebookButton } from './NewNotebookButton';
 import { type NavItem, SIDEBAR_NAV } from './navItems';
 
-function SideLink({ item, onNavigate }: { item: NavItem; onNavigate?: (() => void) | undefined }) {
+function SideLink({
+  item,
+  onNavigate,
+  badge,
+}: {
+  item: NavItem;
+  onNavigate?: (() => void) | undefined;
+  badge?: number;
+}) {
   return (
     <NavLink
       to={item.to}
@@ -21,6 +31,12 @@ function SideLink({ item, onNavigate }: { item: NavItem; onNavigate?: (() => voi
         <>
           <Icon name={item.icon} filled={isActive} />
           <span className="truncate">{t(item.label)}</span>
+          {badge ? (
+            <span className="ml-auto rounded-full bg-primary-soft px-2 py-0.5 text-xs font-bold text-accent-on-soft">
+              <span className="sr-only">{t('flashcards.dueBadge', { count: badge })}</span>
+              <span aria-hidden="true">{badge}</span>
+            </span>
+          ) : null}
         </>
       )}
     </NavLink>
@@ -31,6 +47,7 @@ function SideLink({ item, onNavigate }: { item: NavItem; onNavigate?: (() => voi
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const notebooks = useNotebooks();
   const counts = notebooks.status === 'ready' ? countBySubject(notebooks.data) : {};
+  const due = useLive<number>('due', (next, fail) => subscribeDueCount('', next, fail));
   return (
     <div className="flex h-full flex-col gap-6 p-4">
       <div className="px-2 pt-2">
@@ -38,7 +55,12 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </div>
       <nav aria-label={t('nav.main')} className="flex flex-col gap-1">
         {SIDEBAR_NAV.map((item) => (
-          <SideLink key={item.to} item={item} onNavigate={onNavigate} />
+          <SideLink
+            key={item.to}
+            item={item}
+            onNavigate={onNavigate}
+            {...(item.to === '/flashcards' && due.status === 'ready' ? { badge: due.data } : {})}
+          />
         ))}
       </nav>
       <div className="min-h-0 flex-1 overflow-y-auto">

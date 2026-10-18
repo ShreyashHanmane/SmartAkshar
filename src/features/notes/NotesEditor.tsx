@@ -138,6 +138,8 @@ export function NotesEditor({
   const fileRef = useRef<HTMLInputElement>(null);
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
   const loaded = useRef(false);
+  /** Server time of our latest confirmed save; older fetched copies are ignored. */
+  const [lastSaved] = useState(() => ({ at: 0 }));
   const editorRef = useRef<Editor | null>(null);
   const [linking, setLinking] = useState(false);
   const [uploading, setUploading] = useState(0);
@@ -147,7 +149,10 @@ export function NotesEditor({
   const [saver] = useState(
     () =>
       new DocSaver<NoteContent>({
-        save: (content) => saveNote(user.uid, notebookId, content),
+        save: async (content) => {
+          const time = await saveNote(user.uid, notebookId, content);
+          lastSaved.at = Math.max(lastSaved.at, time);
+        },
         setTimer: (fn, ms) => window.setTimeout(fn, ms),
         clearTimer: (id) => window.clearTimeout(id),
         isTransient: (e) => e instanceof ApiError && e.status === 0,
@@ -216,9 +221,10 @@ export function NotesEditor({
     return subscribeNote(
       user.uid,
       notebookId,
-      (content) => {
+      (content, updatedAt) => {
         const s = saver.getState();
-        if (loaded.current && (s.dirty || s.inFlight > 0 || editor.isFocused)) return;
+        if (loaded.current && (s.dirty || s.inFlight > 0 || editor.isFocused || updatedAt < lastSaved.at))
+          return;
         const clean = cleanContent(content ?? { type: 'doc' });
         if (JSON.stringify(clean) !== JSON.stringify(editor.getJSON()))
           editor.commands.setContent(clean, { emitUpdate: false });
@@ -227,7 +233,7 @@ export function NotesEditor({
       },
       () => setLoadState('error'),
     );
-  }, [editor, user.uid, notebookId, saver]);
+  }, [editor, user.uid, notebookId, saver, lastSaved]);
 
   useEffect(() => {
     editorRef.current = editor;

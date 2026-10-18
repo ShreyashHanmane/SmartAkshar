@@ -32,6 +32,7 @@ import { FullPageLoader } from '../../ui/FullPageLoader';
 import { Icon } from '../../ui/Icon';
 import { Segmented } from '../../ui/Segmented';
 import { useToast } from '../../ui/Toast';
+import { CreateFlashcardDialog } from '../flashcards/dialogs';
 import { SubjectsProvider } from '../subjects/SubjectsProvider';
 import { Editor } from '../whiteboard/WhiteboardPage';
 import { BookView, type SelectionEvent } from './BookView';
@@ -92,6 +93,7 @@ function Reader({ book }: { book: Book }) {
   const [fraction, setFraction] = useState(book.position.fraction ?? 0);
   const [selection, setSelection] = useState<SelectionEvent | null>(null);
   const [clicked, setClicked] = useState<{ id: string; rect: SelectionEvent['rect'] } | null>(null);
+  const [cardText, setCardText] = useState<string | null>(null);
   const [split, setSplit] = useState(readSplit);
   const [mobileTab, setMobileTab] = useState<'book' | 'notes'>('book');
   const paneRef = useRef<HTMLDivElement>(null);
@@ -285,7 +287,14 @@ function Reader({ book }: { book: Book }) {
                   setSelection(null);
                 },
               },
-              { label: 'reader.createFlashcard', icon: 'cards', comingSoon: true },
+              {
+                label: 'reader.createFlashcard',
+                icon: 'cards',
+                onSelect: () => {
+                  setCardText(selection.quote.exact);
+                  setSelection(null);
+                },
+              },
               { label: 'reader.explain', icon: 'sparkle', comingSoon: true },
               { label: 'reader.summarize', icon: 'sparkle', comingSoon: true },
               { label: 'reader.translate', icon: 'sparkle', comingSoon: true },
@@ -360,6 +369,7 @@ function Reader({ book }: { book: Book }) {
         </div>
       )}
 
+      {cardText !== null && <CreateFlashcardDialog text={cardText} onClose={() => setCardText(null)} />}
       <div ref={bodyRef} className="flex min-h-0 flex-1">
         {!withNotes && <div className="min-w-0 flex-1">{bookPane}</div>}
         {withNotes && (

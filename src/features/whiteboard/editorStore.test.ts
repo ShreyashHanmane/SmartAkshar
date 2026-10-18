@@ -67,6 +67,18 @@ describe('EditorStore', () => {
     vi.useRealTimers();
   });
 
+  it('ignores a remote copy fetched before our latest confirmed save', async () => {
+    const { store, deps } = setup();
+    deps.save = () => Promise.resolve(2000);
+    store.setElements('p0', [el('new')]);
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+    store.applyRemote([{ id: 'p0', index: 0, elements: [el('old')], updatedAt: 1000 }]);
+    expect(store.getSnapshot().pages[0]?.elements[0]?.id).toBe('new');
+    store.applyRemote([{ id: 'p0', index: 0, elements: [el('other device')], updatedAt: 3000 }]);
+    expect(store.getSnapshot().pages[0]?.elements[0]?.id).toBe('other device');
+    vi.useRealTimers();
+  });
+
   it('retries rejected writes with backoff, then shows an error, and recovers on retry', async () => {
     let fail = true;
     const { store, saved } = setup(() => (fail ? Promise.reject(new Error('denied')) : Promise.resolve()));

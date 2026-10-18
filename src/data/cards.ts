@@ -12,7 +12,7 @@ function endOfToday(now = new Date()): number {
 export function subscribeDueCount(_uid: string, next: (count: number) => void, fail: (e: unknown) => void) {
   return live(
     async () => (await getJson(`/api/cards/due-count?before=${endOfToday()}`, z.object({ count: z.number() }))).count,
-    ['cards'],
+    ['cards', 'decks'],
     next,
     fail,
   );

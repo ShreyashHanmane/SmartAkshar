@@ -6,10 +6,13 @@ export interface StorePage {
   id: string;
   index: number;
   elements: Element[];
+  /** Server time of the version this copy reflects (remote copies only). */
+  updatedAt?: number;
 }
 
 export interface StoreDeps {
-  save: (page: StorePage) => Promise<void>;
+  /** Resolves with the server's save time when known. */
+  save: (page: StorePage) => Promise<unknown>;
   addPage: (index: number) => { id: string; done: Promise<void> };
   touch: () => void;
   /** Size in bytes of a page's stored form (to stay under Firestore's limit). */
@@ -47,6 +50,8 @@ export class EditorStore {
   private loadState: Snapshot['loadState'] = 'loading';
   private dirty = new Set<string>();
   private inFlight = new Map<string, number>();
+  /** Server time of our latest confirmed save per page. */
+  private savedAt = new Map<string, number>();
   private attempts = new Map<string, number>();
   private failed = false;
   private timer: number | null = null;
@@ -88,7 +93,9 @@ export class EditorStore {
     const next = new Map<string, StorePage>();
     for (const page of remote) {
       const local = this.pages.get(page.id);
-      const busy = this.dirty.has(page.id) || this.inFlight.has(page.id);
+      // A copy fetched before our latest confirmed save is stale: never let it win.
+      const stale = page.updatedAt !== undefined && page.updatedAt < (this.savedAt.get(page.id) ?? 0);
+      const busy = this.dirty.has(page.id) || this.inFlight.has(page.id) || stale;
       next.set(page.id, busy && local ? { ...local, index: page.index } : page);
     }
     // Keep local pages the server hasn't seen yet (e.g. added while offline).
@@ -183,7 +190,8 @@ export class EditorStore {
     this.inFlight.set(id, (this.inFlight.get(id) ?? 0) + 1);
     this.deps
       .save(page)
-      .then(() => {
+      .then((time) => {
+        if (typeof time === 'number') this.savedAt.set(id, Math.max(time, this.savedAt.get(id) ?? 0));
         this.attempts.delete(id);
         if (this.attempts.size === 0) this.failed = false;
       })

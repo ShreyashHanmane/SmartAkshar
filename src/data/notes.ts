@@ -10,19 +10,25 @@ const enc = encodeURIComponent;
 export function subscribeNote(
   _uid: string,
   notebookId: string,
-  next: (content: NoteContent | null, pending: boolean) => void,
+  next: (content: NoteContent | null, updatedAt: number) => void,
   fail: (e: unknown) => void,
 ) {
   return live(
-    () => getJson(`/api/notebooks/${enc(notebookId)}/note`, z.object({ content: z.record(z.string(), z.unknown()).nullable() })),
+    () =>
+      getJson(
+        `/api/notebooks/${enc(notebookId)}/note`,
+        z.object({ content: z.record(z.string(), z.unknown()).nullable(), updatedAt: z.number().catch(0) }),
+      ),
     [`note:${notebookId}`],
-    (v) => next(v.content, false),
+    (v) => next(v.content, v.updatedAt),
     fail,
   );
 }
 
-export async function saveNote(_uid: string, notebookId: string, content: NoteContent): Promise<void> {
-  await send('PUT', `/api/notebooks/${enc(notebookId)}/note`, { content });
+/** Saves the note; resolves with the server's save time. */
+export async function saveNote(_uid: string, notebookId: string, content: NoteContent): Promise<number> {
+  const res = (await send('PUT', `/api/notebooks/${enc(notebookId)}/note`, { content })) as { updatedAt?: number } | null;
+  return res?.updatedAt ?? 0;
 }
 
 /** Uploads an image for a note; the server checks it again and returns its URL. */

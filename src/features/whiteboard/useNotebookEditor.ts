@@ -30,7 +30,10 @@ export function useNotebookEditor(uid: string, notebookId: string) {
       subscribePages(
         uid,
         notebookId,
-        (pages) => store.applyRemote(pages.map(({ id, index, elements }) => ({ id, index, elements }))),
+        (pages) =>
+          store.applyRemote(
+            pages.map(({ id, index, elements, updatedAt }) => ({ id, index, elements, updatedAt })),
+          ),
         () => store.failLoad(),
       ),
     [store, uid, notebookId],
