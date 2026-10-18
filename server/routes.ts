@@ -49,6 +49,7 @@ import {
   verifyPassword,
 } from './auth.ts';
 import { type Db, tx } from './db.ts';
+import { addStarterContent } from './starter.ts';
 import type { EventHub } from './events.ts';
 import { HttpError, noContent, readJson, sendJson, streamToFile } from './http.ts';
 import { RateLimiter } from './security.ts';
@@ -118,11 +119,14 @@ route('POST', '/api/auth/signup', async (ctx) => {
   if (exists) throw new HttpError(409, 'username-taken');
   const id = newId();
   const hash = await hashPassword(body.password);
-  ctx.db
-    .prepare(
-      'INSERT INTO users (id, username, display_name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)',
-    )
-    .run(id, body.username, body.name, hash, now());
+  tx(ctx.db, () => {
+    ctx.db
+      .prepare(
+        'INSERT INTO users (id, username, display_name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)',
+      )
+      .run(id, body.username, body.name, hash, now());
+    if (body.starter !== false) addStarterContent(ctx.db, id, now());
+  });
   createSession(ctx.db, id, ctx.res, ctx.secure);
   sendJson(ctx.res, 201, { user: userView(ctx.db, id) });
 });

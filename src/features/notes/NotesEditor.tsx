@@ -58,6 +58,8 @@ function Tool({ icon, text, label, active = false, disabled = false, onClick }: 
       title={t(label)}
       aria-pressed={active}
       disabled={disabled}
+      // Keep the editor's focus and selection when a toolbar button is pressed (mouse, pen, or touch).
+      onPointerDown={(e) => e.preventDefault()}
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
       className={`inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-sm font-bold disabled:opacity-35 ${active ? 'bg-primary-soft text-accent-on-soft' : 'text-ink hover:bg-primary-soft'}`}
@@ -67,7 +69,44 @@ function Tool({ icon, text, label, active = false, disabled = false, onClick }: 
   );
 }
 
-function LinkDialog({ editor, onClose }: { editor: Editor; onClose: () => void }) {
+/**
+ * The range the student selected. The editor state can lag the browser's
+ * selection by an event (it syncs on "selectionchange"), and tapping a toolbar
+ * button on touch screens can collapse it, so check the live DOM selection and
+ * the last non-empty selection too.
+ */
+function selectedRange(editor: Editor, last: { from: number; to: number } | null) {
+  const { from, to, empty } = editor.state.selection;
+  if (!empty) return { from, to };
+  const dom = window.getSelection();
+  if (
+    dom &&
+    !dom.isCollapsed &&
+    dom.anchorNode &&
+    dom.focusNode &&
+    editor.view.dom.contains(dom.anchorNode)
+  ) {
+    try {
+      const a = editor.view.posAtDOM(dom.anchorNode, dom.anchorOffset);
+      const b = editor.view.posAtDOM(dom.focusNode, dom.focusOffset);
+      if (a !== b) return { from: Math.min(a, b), to: Math.max(a, b) };
+    } catch {
+      // Fall through to the remembered selection.
+    }
+  }
+  if (last && last.to <= editor.state.doc.content.size) return last;
+  return { from, to };
+}
+
+function LinkDialog({
+  editor,
+  range,
+  onClose,
+}: {
+  editor: Editor;
+  range: { from: number; to: number };
+  onClose: () => void;
+}) {
   const current = editor.getAttributes('link').href as string | undefined;
   const [value, setValue] = useState(current ?? '');
   const [error, setError] = useState<string | undefined>();
@@ -76,7 +115,7 @@ function LinkDialog({ editor, onClose }: { editor: Editor; onClose: () => void }
     e.preventDefault();
     const raw = value.trim();
     if (!raw) {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run();
+      editor.chain().focus().setTextSelection(range).extendMarkRange('link').unsetLink().run();
       onClose();
       return;
     }
@@ -85,7 +124,7 @@ function LinkDialog({ editor, onClose }: { editor: Editor; onClose: () => void }
       setError(t('notes.linkInvalid'));
       return;
     }
-    editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
+    editor.chain().focus().setTextSelection(range).extendMarkRange('link').setLink({ href }).run();
     onClose();
   }
 
@@ -141,7 +180,9 @@ export function NotesEditor({
   /** Server time of our latest confirmed save; older fetched copies are ignored. */
   const [lastSaved] = useState(() => ({ at: 0 }));
   const editorRef = useRef<Editor | null>(null);
-  const [linking, setLinking] = useState(false);
+  const [linking, setLinking] = useState<{ from: number; to: number } | null>(null);
+  /** Last non-empty selection: tapping a toolbar button on touch screens can collapse it first. */
+  const lastRange = useRef<{ from: number; to: number } | null>(null);
   const [uploading, setUploading] = useState(0);
   const [tooLarge, setTooLarge] = useState(false);
   useStudyTracker();
@@ -168,44 +209,55 @@ export function NotesEditor({
 
   useEffect(() => onStatus(status, () => saver.retry()), [status, saver, onStatus]);
 
+  // Extensions and editor props must keep the same identity across renders:
+  // Tiptap re-applies options whose identity changes, which can overwrite a
+  // selection the editor hasn't processed yet (e.g. when autosave re-renders).
+  const insertImageRef = useRef<(file: File) => Promise<void>>(() => Promise.resolve());
+  const [extensions] = useState(() => [
+    StarterKit.configure({
+      heading: { levels: [1, 2, 3] },
+      link: {
+        openOnClick: false,
+        autolink: true,
+        defaultProtocol: 'https',
+        protocols: [],
+        isAllowedUri: (url) => isSafeHref(url),
+        HTMLAttributes: { rel: 'noopener noreferrer nofollow', target: '_blank' },
+      },
+    }),
+    Image.configure({ allowBase64: false, inline: false }),
+  ]);
+  const [editorProps] = useState(() => ({
+    attributes: {
+      class: 'notes-prose',
+      'aria-label': t('notes.editor'),
+      role: 'textbox',
+      'aria-multiline': 'true',
+    },
+    transformPastedHTML: (html: string) => sanitizePaste(html),
+    handlePaste: (_view: unknown, event: ClipboardEvent) => {
+      const files = [...(event.clipboardData?.files ?? [])].filter((f) => f.type.startsWith('image/'));
+      if (!files.length) return false;
+      for (const f of files) void insertImageRef.current(f);
+      return true;
+    },
+    handleDrop: (_view: unknown, event: DragEvent) => {
+      const files = [...(event.dataTransfer?.files ?? [])].filter((f) => f.type.startsWith('image/'));
+      if (!files.length) return false;
+      event.preventDefault();
+      for (const f of files) void insertImageRef.current(f);
+      return true;
+    },
+  }));
+
   const editor = useEditor({
     shouldRerenderOnTransaction: true,
     immediatelyRender: false,
-    extensions: [
-      StarterKit.configure({
-        heading: { levels: [1, 2, 3] },
-        link: {
-          openOnClick: false,
-          autolink: true,
-          defaultProtocol: 'https',
-          protocols: [],
-          isAllowedUri: (url) => isSafeHref(url),
-          HTMLAttributes: { rel: 'noopener noreferrer nofollow', target: '_blank' },
-        },
-      }),
-      Image.configure({ allowBase64: false, inline: false }),
-    ],
-    editorProps: {
-      attributes: {
-        class: 'notes-prose',
-        'aria-label': t('notes.editor'),
-        role: 'textbox',
-        'aria-multiline': 'true',
-      },
-      transformPastedHTML: (html) => sanitizePaste(html),
-      handlePaste: (_view, event) => {
-        const files = [...(event.clipboardData?.files ?? [])].filter((f) => f.type.startsWith('image/'));
-        if (!files.length) return false;
-        for (const f of files) void insertImage(f);
-        return true;
-      },
-      handleDrop: (_view, event) => {
-        const files = [...(event.dataTransfer?.files ?? [])].filter((f) => f.type.startsWith('image/'));
-        if (!files.length) return false;
-        event.preventDefault();
-        for (const f of files) void insertImage(f);
-        return true;
-      },
+    extensions,
+    editorProps,
+    onSelectionUpdate: ({ editor: e }) => {
+      const { from, to, empty } = e.state.selection;
+      if (!empty) lastRange.current = { from, to };
     },
     onUpdate: ({ editor: e }) => {
       const content = cleanContent(e.getJSON()) as unknown as NoteContent;
@@ -223,10 +275,11 @@ export function NotesEditor({
       notebookId,
       (content, updatedAt) => {
         const s = saver.getState();
-        if (loaded.current && (s.dirty || s.inFlight > 0 || editor.isFocused || updatedAt < lastSaved.at))
+        if (loaded.current && (s.dirty || s.inFlight > 0 || editor.isFocused || updatedAt <= lastSaved.at))
           return;
         const clean = cleanContent(content ?? { type: 'doc' });
-        if (JSON.stringify(clean) !== JSON.stringify(editor.getJSON()))
+        // Compare cleaned with cleaned: a cosmetic difference must never reset the selection.
+        if (JSON.stringify(clean) !== JSON.stringify(cleanContent(editor.getJSON())))
           editor.commands.setContent(clean, { emitUpdate: false });
         loaded.current = true;
         setLoadState('ready');
@@ -237,7 +290,8 @@ export function NotesEditor({
 
   useEffect(() => {
     editorRef.current = editor;
-  }, [editor]);
+    insertImageRef.current = insertImage;
+  });
 
   // Save pending edits when leaving.
   useEffect(() => () => saver.flush(), [saver]);
@@ -370,7 +424,9 @@ export function NotesEditor({
           icon="arrowRight"
           label="notes.link"
           active={e?.isActive('link') ?? false}
-          onClick={() => setLinking(true)}
+          onClick={() => {
+            if (e) setLinking(selectedRange(e, lastRange.current));
+          }}
         />
         <Tool
           icon="upload"
@@ -416,7 +472,7 @@ export function NotesEditor({
           </div>
         </div>
       </div>
-      {linking && e && <LinkDialog editor={e} onClose={() => setLinking(false)} />}
+      {linking && e && <LinkDialog editor={e} range={linking} onClose={() => setLinking(null)} />}
     </div>
   );
 }

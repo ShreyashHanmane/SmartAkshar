@@ -10,16 +10,17 @@ interface Props {
   onMove: () => void;
   onErase: () => void;
   onDone: () => void;
+  onAi: (action: 'handwriting' | 'explain' | 'translate') => void;
 }
 
-const AI_ACTIONS: { label: MessageKey; icon: IconName }[] = [
-  { label: 'whiteboard.ai.convert', icon: 'file' },
-  { label: 'whiteboard.ai.explain', icon: 'sparkle' },
-  { label: 'whiteboard.ai.translate', icon: 'sparkle' },
+const AI_ACTIONS: { label: MessageKey; icon: IconName; action: 'handwriting' | 'explain' | 'translate' }[] = [
+  { label: 'whiteboard.ai.convert', icon: 'file', action: 'handwriting' },
+  { label: 'whiteboard.ai.explain', icon: 'sparkle', action: 'explain' },
+  { label: 'whiteboard.ai.translate', icon: 'sparkle', action: 'translate' },
 ];
 
 /** Floating menu for a lasso selection: Move, Erase, and the AI actions. */
-export function SelectionMenu({ anchor, bounds, count, onMove, onErase, onDone }: Props) {
+export function SelectionMenu({ anchor, bounds, count, onMove, onErase, onDone, onAi }: Props) {
   const [hint, setHint] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState(56);
@@ -61,13 +62,7 @@ export function SelectionMenu({ anchor, bounds, count, onMove, onErase, onDone }
           <Icon name="trash" size={18} /> {t('whiteboard.erase')}
         </button>
         {AI_ACTIONS.map((a) => (
-          <button
-            key={a.label}
-            type="button"
-            aria-disabled="true"
-            title={t('common.comingSoon')}
-            className={`${btn} cursor-not-allowed opacity-60`}
-          >
+          <button key={a.label} type="button" className={btn} onClick={() => onAi(a.action)}>
             <Icon name={a.icon} size={18} /> {t(a.label)}
           </button>
         ))}

@@ -46,9 +46,10 @@ interface TopBarProps {
   /** Paged | Infinite switch (whiteboard view only). */
   mode?: { value: 'paged' | 'infinite'; onChange: (mode: 'paged' | 'infinite') => void };
   menu: MenuItem[];
+  onAi: () => void;
 }
 
-export function TopBar({ title, subject, status, onRetry, view, onView, mode, menu }: TopBarProps) {
+export function TopBar({ title, subject, status, onRetry, view, onView, mode, menu, onAi }: TopBarProps) {
   return (
     <header className="flex min-h-14 flex-wrap items-center gap-2 border-b border-line bg-surface px-2 py-1 sm:flex-nowrap sm:px-3">
       <Link
@@ -70,9 +71,9 @@ export function TopBar({ title, subject, status, onRetry, view, onView, mode, me
       <button
         type="button"
         aria-label={t('whiteboard.ai')}
-        aria-disabled="true"
-        title={t('common.comingSoon')}
-        className="inline-flex size-11 shrink-0 cursor-not-allowed items-center justify-center rounded-lg text-ink opacity-60 sm:order-last"
+        title={t('whiteboard.ai')}
+        onClick={onAi}
+        className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-ink hover:bg-primary-soft sm:order-last"
       >
         <Icon name="sparkle" />
       </button>

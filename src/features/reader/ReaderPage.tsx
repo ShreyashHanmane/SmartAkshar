@@ -35,7 +35,10 @@ import { useToast } from '../../ui/Toast';
 import { CreateFlashcardDialog } from '../flashcards/dialogs';
 import { SubjectsProvider } from '../subjects/SubjectsProvider';
 import { Editor } from '../whiteboard/WhiteboardPage';
-import { BookView, type SelectionEvent } from './BookView';
+import { type BookTextApi, BookView, type SelectionEvent } from './BookView';
+import { AiPanel, type AiSource } from '../ai/AiPanel';
+import { AI_MAX_TEXT, type AiAction } from '../../shared/schemas';
+import { Menu } from '../../ui/Menu';
 import { SelectionPopover } from './SelectionPopover';
 
 const SPLIT_KEY = `${LOCAL_KEY_PREFIX}reader:split`;
@@ -94,6 +97,8 @@ function Reader({ book }: { book: Book }) {
   const [selection, setSelection] = useState<SelectionEvent | null>(null);
   const [clicked, setClicked] = useState<{ id: string; rect: SelectionEvent['rect'] } | null>(null);
   const [cardText, setCardText] = useState<string | null>(null);
+  const [ai, setAi] = useState<{ source: AiSource; actions: AiAction[]; autoRun?: AiAction } | null>(null);
+  const textApi = useRef<BookTextApi | null>(null);
   const [split, setSplit] = useState(readSplit);
   const [mobileTab, setMobileTab] = useState<'book' | 'notes'>('book');
   const paneRef = useRef<HTMLDivElement>(null);
@@ -268,6 +273,9 @@ function Reader({ book }: { book: Book }) {
             }}
             onHighlightClick={(id, rect) => setClicked({ id, rect })}
             onScrollFraction={setFraction}
+            onTextApi={(api) => {
+              textApi.current = api;
+            }}
           />
         )}
         {selection && (
@@ -295,9 +303,48 @@ function Reader({ book }: { book: Book }) {
                   setSelection(null);
                 },
               },
-              { label: 'reader.explain', icon: 'sparkle', comingSoon: true },
-              { label: 'reader.summarize', icon: 'sparkle', comingSoon: true },
-              { label: 'reader.translate', icon: 'sparkle', comingSoon: true },
+              {
+                label: 'reader.explain',
+                icon: 'sparkle',
+                onSelect: () => {
+                  setAi({
+                    source: { kind: 'text', text: selection.quote.exact, label: t('ai.selectedText') },
+                    actions: ['explain', 'explain', 'summarize', 'translate'].filter(
+                      (a, i, all) => all.indexOf(a) === i,
+                    ) as AiAction[],
+                    autoRun: 'explain',
+                  });
+                  setSelection(null);
+                },
+              },
+              {
+                label: 'reader.summarize',
+                icon: 'sparkle',
+                onSelect: () => {
+                  setAi({
+                    source: { kind: 'text', text: selection.quote.exact, label: t('ai.selectedText') },
+                    actions: ['summarize', 'explain', 'summarize', 'translate'].filter(
+                      (a, i, all) => all.indexOf(a) === i,
+                    ) as AiAction[],
+                    autoRun: 'summarize',
+                  });
+                  setSelection(null);
+                },
+              },
+              {
+                label: 'reader.translate',
+                icon: 'sparkle',
+                onSelect: () => {
+                  setAi({
+                    source: { kind: 'text', text: selection.quote.exact, label: t('ai.selectedText') },
+                    actions: ['translate', 'explain', 'summarize', 'translate'].filter(
+                      (a, i, all) => all.indexOf(a) === i,
+                    ) as AiAction[],
+                    autoRun: 'translate',
+                  });
+                  setSelection(null);
+                },
+              },
             ]}
           />
         )}
@@ -315,6 +362,23 @@ function Reader({ book }: { book: Book }) {
                   removeHighlight(uid, book.id, clicked.id).catch(() =>
                     toast.error(t('reader.highlightFailed')),
                   );
+                  setClicked(null);
+                },
+              },
+              {
+                label: 'ai.makeCards',
+                icon: 'sparkle',
+                onSelect: () => {
+                  const h =
+                    highlights.status === 'ready'
+                      ? highlights.data.find((x) => x.id === clicked.id)
+                      : undefined;
+                  if (h)
+                    setAi({
+                      source: { kind: 'text', text: h.exact, label: t('ai.highlight') },
+                      actions: ['flashcards'],
+                      autoRun: 'flashcards',
+                    });
                   setClicked(null);
                 },
               },
@@ -345,6 +409,39 @@ function Reader({ book }: { book: Book }) {
           </p>
           <h1 className="truncate text-sm font-semibold text-ink sm:text-base">{book.title}</h1>
         </div>
+        <Menu
+          label={t('ai.summarizeMenu')}
+          trigger={<Icon name="sparkle" />}
+          items={[
+            {
+              label: t('ai.summarizePage'),
+              icon: 'sparkle',
+              onSelect: () => {
+                const text = textApi.current?.sectionText() ?? '';
+                if (!text) return toast.info(t('ai.nothingToSend'));
+                setAi({
+                  source: { kind: 'text', text, label: sectionLabel },
+                  actions: ['summarize', 'explain', 'translate', 'flashcards'],
+                  autoRun: 'summarize',
+                });
+              },
+            },
+            {
+              label: t('ai.summarizeBook'),
+              icon: 'book',
+              onSelect: () => {
+                void textApi.current?.bookText(AI_MAX_TEXT).then((text) => {
+                  if (!text) return toast.info(t('ai.nothingToSend'));
+                  setAi({
+                    source: { kind: 'text', text, label: t('ai.wholeBook', { max: AI_MAX_TEXT }) },
+                    actions: ['summarize', 'flashcards'],
+                    autoRun: 'summarize',
+                  });
+                });
+              },
+            },
+          ]}
+        />
         <button
           type="button"
           onClick={() => setParams(withNotes ? {} : { notes: '1' }, { replace: true })}
@@ -369,6 +466,15 @@ function Reader({ book }: { book: Book }) {
         </div>
       )}
 
+      {ai && (
+        <AiPanel
+          source={ai.source}
+          actions={ai.actions}
+          autoRun={ai.autoRun}
+          notebookId={book.notebookId}
+          onClose={() => setAi(null)}
+        />
+      )}
       {cardText !== null && <CreateFlashcardDialog text={cardText} onClose={() => setCardText(null)} />}
       <div ref={bodyRef} className="flex min-h-0 flex-1">
         {!withNotes && <div className="min-w-0 flex-1">{bookPane}</div>}

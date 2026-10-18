@@ -30,7 +30,7 @@ data/            Local database (akshar.db) and uploaded files — gitignored, c
 ## Data
 
 - **Database:** one SQLite file, `data/akshar.db` (WAL mode, foreign keys on, versioned migrations in `server/db.ts`).
-  - Tables: `users`, `sessions`, `settings`, `subjects`, `notebooks`, `pages`, `notes`, `activity`, `files`, `books`, `highlights`, `cards`.
+  - Tables: `users`, `sessions`, `settings`, `subjects`, `notebooks`, `pages`, `notes`, `activity`, `files`, `books`, `highlights`, `decks`, `cards`, `ai_usage`.
   - Every user-owned row has `user_id`, and every query filters by the session's user.
 - **Files:** `data/files/<userId>/{images,books}/<random hex>.<ext>`. Each file has a row in `files` (owner, size) used for access checks and the 200 MB-per-user quota.
 - **Pages:** each whiteboard page is one row; its elements are stored as JSON in the compact format (`src/shared/schemas.ts` → `storedElement`). Last write wins per page.
@@ -51,6 +51,19 @@ data/            Local database (akshar.db) and uploaded files — gitignored, c
   - Served only to their owner, with `Content-Security-Policy: sandbox` and `nosniff`; books as attachments.
 - **Headers:** CSP without `unsafe-eval`, `frame-ancestors 'none'`, nosniff, Referrer-Policy, Permissions-Policy, COOP and CORP.
 - **Password reset:** `npm run reset-password -- <username>`. It prompts for the new password (hidden) and signs out every session.
+
+## AI (optional)
+
+- **Off by default.** The server enables AI only when `GEMINI_API_KEY` is set in `.env.local` (model from `GEMINI_MODEL`, default `gemini-2.5-flash`). Without a key, the AI panel says AI is off and how to turn it on.
+- **Server-side only:** the browser calls `POST /api/ai/run`; only `server/ai/` talks to the provider. The provider sits behind the `AiProvider` interface (`server/ai/provider.ts`), so it can be swapped.
+- **Limits:** session required; 5 requests per minute; 20 per user per day (stored in `ai_usage`, refunded when the provider fails); text up to 12,000 characters, handwriting images up to about 1.5 MB; 30-second timeout; capped output.
+- **Prompt injection:** fixed system instructions; student material is fenced in `<student_material>` tags (closing tags inside it are stripped) and treated as data. Output is plain text, rendered as text, never as HTML; generated flashcards are validated with zod.
+- **Handwriting:** only the selected strokes are rendered to a PNG and sent; the panel says what is sent.
+- **Logs:** metadata only (hashed user id, action, status, duration).
+
+## Starter content
+
+New accounts get 4 subjects (Physics, Mathematics, Chemistry, History) and 4 decks with sample cards (`server/starter.ts`), inserted in the same transaction as the account. They're ordinary data that the user can edit or delete.
 
 ## Commands
 

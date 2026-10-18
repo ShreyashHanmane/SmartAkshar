@@ -62,7 +62,11 @@ test('formatting, autosave, reload, and undo/redo', async ({ page }) => {
 test('links must be web or email addresses', async ({ page }) => {
   await editor(page).click();
   await page.keyboard.type('Read more');
-  await page.keyboard.press('Shift+Home');
+  // Select-all is handled by the editor's own keymap, so its selection state is updated
+  // synchronously. (Shift+Home goes through the browser and is read back asynchronously,
+  // which raced the toolbar tap under heavy parallel load.)
+  await page.keyboard.press('ControlOrMeta+a');
+  await expect.poll(() => page.evaluate(() => document.getSelection()?.toString())).toBe('Read more');
   await fmt(page, 'Link').click();
   const dialog = page.getByRole('dialog', { name: 'Add a link' });
   await dialog.getByLabel('Web address').fill('javascript:alert(1)');

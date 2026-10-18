@@ -24,7 +24,7 @@ Status: works / broken / UI-only / missing / disabled (Coming soon). "Module" re
 | Element                     | Expected behavior                                             | Status                                                                  | Module | Target file                                  |
 | --------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------- | ------ | -------------------------------------------- |
 | Search field                | Global search over notebooks, PDFs, flashcards                | works (subjects now; notebooks, books, decks as their modules add them) | 2      | `src/features/search/SearchBox.tsx`          |
-| Ask AI                      | Opens the AI panel (server-side AI)                           | disabled (Coming soon) until Module 8                                   | 8      | `src/features/dashboard/DashboardPage.tsx`   |
+| Ask AI                      | Opens the AI panel (server-side AI)                           | works (panel explains how to turn AI on if off)                        | 8      | `src/features/dashboard/DashboardPage.tsx`   |
 | Greeting + date + name      | Time-of-day greeting, localized date, user name               | works                                                                   | 3      | `src/features/dashboard/DashboardPage.tsx`   |
 | This week: hours focused    | From real tracked usage                                       | works (real tracked study time)                                         | 3      | `src/features/dashboard/stats.ts`            |
 | Flashcards due + Review now | Real due count; starts review                                 | works (real due count; review screen in Module 7)                       | 3, 7   | `src/features/dashboard/DashboardPage.tsx`   |
@@ -41,9 +41,9 @@ Status: works / broken / UI-only / missing / disabled (Coming soon). "Module" re
 | Back                                            | Return to previous screen                                           | works                                                                          | 4      | `src/features/whiteboard/Bars.tsx`             |
 | Subject + title                                 | Show; rename via "..." menu                                         | works (rename via "..." menu)                                                  | 4      | `src/features/whiteboard/Bars.tsx`             |
 | Saved chip                                      | Saving / Saved / Offline / Error                                    | works (Saving / Saved / Offline / Error + Retry)                               | 4      | `src/features/whiteboard/Bars.tsx`             |
-| Paged / Infinite switch, AI sparkle, "..." menu | Per §5 (hidden under notification in capture)                       | works (switch keeps all content; AI and Export disabled until Modules 8 and 9) | 4, 8   | `src/features/whiteboard/WhiteboardPage.tsx`   |
+| Paged / Infinite switch, AI sparkle, "..." menu | Per §5 (hidden under notification in capture)                       | works (switch keeps all content; sparkle opens the AI panel; Export disabled until Module 9) | 4, 8   | `src/features/whiteboard/WhiteboardPage.tsx`   |
 | Toolbar drag handle                             | Drag; dock left/right/bottom; collapse; remembered                  | works (drag or arrow keys; dock left/right/bottom; collapse; remembered)       | 4      | `src/features/whiteboard/Toolbar.tsx`          |
-| Lasso                                           | Circle-select; Move / Erase / Convert to text / Explain / Translate | works for select, Move, Erase; AI actions disabled until Module 8              | 4, 8   | `src/features/whiteboard/WhiteboardCanvas.tsx` |
+| Lasso                                           | Circle-select; Move / Erase / Convert to text / Explain / Translate | works (select, Move, Erase, Convert to text, Explain, Translate)              | 4, 8   | `src/features/whiteboard/WhiteboardCanvas.tsx` |
 | Pen, Highlighter, Eraser, Shapes, Text          | Real tools; text font picker (sans / serif / handwriting)           | works                                                                          | 4      | `src/features/whiteboard/WhiteboardCanvas.tsx` |
 | 5 color swatches                                | Set stroke color                                                    | works                                                                          | 4      | `src/features/whiteboard/Toolbar.tsx`          |
 | Palette button                                  | Paper style + background, saved per notebook                        | works (paper style + background, saved per notebook)                           | 4      | `src/features/whiteboard/Toolbar.tsx`          |
@@ -82,7 +82,7 @@ Status: works / broken / UI-only / missing / disabled (Coming soon). "Module" re
 | ------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------ | ------- | ------------------------------------------ |
 | Back                | Return                                                     | works                                                                    | 6       | `src/features/reader/ReaderPage.tsx`       |
 | Page X of Y         | Reading position, saved progress                           | works (position saved and restored)                                      | 6       | `src/features/reader/ReaderPage.tsx`       |
-| Text selection menu | Highlight, Create flashcard, Explain, Summarize, Translate | works for Highlight and Create flashcard; AI actions (Module 8) disabled | 6, 8    | `src/features/reader/SelectionPopover.tsx` |
+| Text selection menu | Highlight, Create flashcard, Explain, Summarize, Translate | works (all five; AI actions via the local server)                       | 6, 8    | `src/features/reader/SelectionPopover.tsx` |
 | Highlights          | Saved and restored                                         | works (saved, restored after reload, removable)                          | 6       | `src/features/reader/highlightDom.ts`      |
 | Divider             | Resize panes; tabs Book / Notes on mobile                  | works (drag or arrow keys; Book / Notes tabs on mobile)                  | 6       | `src/features/reader/ReaderPage.tsx`       |
 | Notes pane          | Handwritten/typed notes linked to the book                 | works (embedded whiteboard of the linked notebook)                       | 4, 5, 6 | `src/features/reader/ReaderPage.tsx`       |
@@ -105,7 +105,7 @@ Status: works / broken / UI-only / missing / disabled (Coming soon). "Module" re
 
 - **Auth screens: works.** Local accounts: sign up (name, username, password), login, sign-out, protected routes, session persistence, "Forgot password?" with the local reset command, and a server-unreachable screen. Google sign-in, guest mode and email verification were removed by the local-only decision (2026-10-18).
 - **Notes editor:** Tiptap.
-- **AI side panel / bottom sheet.**
+- **AI side panel / bottom sheet: works.** Summarize, explain, translate, flashcards from text, handwriting to text; cancel, errors, daily usage, copy / insert into notes / save as flashcards. Reader header: summarize this page or the whole book.
 - **Exports:** whiteboard PDF/PNG, notes PDF/DOCX, ZIP.
 - **Offline / PWA.**
 - **Missing states on every screen:** empty, loading (skeleton), error, offline, save confirmations and toasts.

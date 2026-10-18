@@ -39,3 +39,20 @@ export async function uploadNoteImage(_uid: string, notebookId: string, file: Bl
   });
   return z.object({ url: z.string() }).parse(await res.json()).url;
 }
+
+/** Appends plain-text paragraphs to a notebook's typed notes (used by AI "Insert into notes"). */
+export async function appendToNote(notebookId: string, text: string): Promise<void> {
+  const current = await getJson(
+    `/api/notebooks/${enc(notebookId)}/note`,
+    z.object({ content: z.record(z.string(), z.unknown()).nullable() }),
+  );
+  const doc = (current.content ?? { type: 'doc', content: [] }) as { type: string; content?: unknown[] };
+  const paragraphs = text
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => ({ type: 'paragraph', content: [{ type: 'text', text: p.slice(0, 20_000) }] }));
+  await send('PUT', `/api/notebooks/${enc(notebookId)}/note`, {
+    content: { type: 'doc', content: [...(doc.content ?? []), ...paragraphs] },
+  });
+}

@@ -14,6 +14,9 @@ import { FullPageLoader } from '../../ui/FullPageLoader';
 import { Icon } from '../../ui/Icon';
 import { useToast } from '../../ui/Toast';
 import { NotesEditor } from '../notes/NotesEditor';
+import { AiPanel, type AiSource } from '../ai/AiPanel';
+import type { AiAction } from '../../shared/schemas';
+import { elementsToPng } from './snapshot';
 import type { SaveStatus } from './saveState';
 import { DeleteNotebookDialog, RenameNotebookDialog } from '../notebooks/NotebookDialogs';
 import { SubjectsProvider, useSubject } from '../subjects/SubjectsProvider';
@@ -103,6 +106,7 @@ export function Editor({
   const [dialog, setDialog] = useState<'rename' | 'delete' | null>(null);
   const [confirmPaged, setConfirmPaged] = useState<{ pages: Element[][]; outside: number } | null>(null);
   const [switching, setSwitching] = useState(false);
+  const [ai, setAi] = useState<{ source: AiSource; autoRun?: AiAction } | null>(null);
   const [notesSave, setNotesSave] = useState<{ status: SaveStatus; retry: () => void }>({
     status: 'saved',
     retry: () => undefined,
@@ -267,6 +271,16 @@ export function Editor({
     { label: t('common.delete'), icon: 'trash' as const, danger: true, onSelect: () => setDialog('delete') },
   ];
 
+  // AI: an image of only the strokes asked about (the whole page from the sparkle, or the lasso selection).
+  function openAi(elements: Element[], label: string, autoRun?: AiAction) {
+    const png = elementsToPng(elements);
+    if (!png) {
+      toast.info(t('ai.nothingToSend'));
+      return;
+    }
+    setAi({ source: { kind: 'image', png, label }, ...(autoRun ? { autoRun } : {}) });
+  }
+
   const notesMenu = [
     {
       label: t('notes.exportPdf'),
@@ -297,6 +311,7 @@ export function Editor({
           view={tab}
           onView={onTab}
           menu={notesMenu}
+          onAi={() => openAi(page?.elements ?? [], t('ai.thisPage'))}
         />
         <div className="min-h-0 flex-1">
           <NotesEditor notebookId={notebook.id} onStatus={onNotesStatus} />
@@ -330,6 +345,7 @@ export function Editor({
           onView={onTab}
           mode={{ value: mode, onChange: (m) => void switchMode(m) }}
           menu={menu}
+          onAi={() => openAi(page?.elements ?? [], t('ai.thisPage'))}
         />
       )}
       <div ref={bodyRef} className="relative min-h-0 flex-1">
@@ -351,6 +367,7 @@ export function Editor({
             insets={insets}
             onChange={(els) => editor.setElements(page.id, els)}
             onPageFull={() => toast.error(t('whiteboard.pageFull'))}
+            onAiSelection={(els, action) => openAi(els, t('ai.selection'), action)}
             label={
               mode === 'paged'
                 ? t('whiteboard.canvasPaged', {
@@ -417,6 +434,15 @@ export function Editor({
           notebook={notebook}
           onClose={() => setDialog(null)}
           onDeleted={() => navigate('/notebooks')}
+        />
+      )}
+      {ai && (
+        <AiPanel
+          source={ai.source}
+          actions={['handwriting', 'explain', 'translate']}
+          autoRun={ai.autoRun}
+          notebookId={notebook.id}
+          onClose={() => setAi(null)}
         />
       )}
       {confirmPaged && (

@@ -245,3 +245,33 @@
 - **Stale refetch race (found by a flaky notes test):** a live-update refetch that started before a save could arrive after it and briefly show older content. Saves now return the server's `updatedAt`; the whiteboard store and the notes editor ignore copies older than their latest confirmed save (unit-tested).
 
 **Tests:** 7 new e2e scenarios (deck and cards with due counts and badge; review by click, swipe and keyboard with schedule saved; quiz; edit and delete; Create and Progress tabs; flashcard from a PDF selection; dashboard Review now), 5 server tests and 7 scheduler unit tests. Full e2e suite: 172 passed, twice in a row.
+
+## Module 8: AI (branch `feat/ai`)
+
+**Status:** complete. Gemini through the local server; off until `GEMINI_API_KEY` is set in `.env.local`.
+
+**Done**
+
+- **Server** (`server/ai/`):
+  - `POST /api/ai/run` and `GET /api/ai/status`, with the provider behind the `AiProvider` interface (Gemini by default).
+  - Limits: session required; 5 requests per minute; 20 per day (counted in the new `ai_usage` table and refunded on provider errors); text capped at 12,000 characters; handwriting images capped; 30-second timeout; output capped.
+  - Prompt-injection defense: fixed system instructions, with student material fenced and treated as data.
+  - Logs are metadata only, with a hashed user id.
+- **AI panel:** a side panel on desktop and tablet, a bottom sheet on mobile.
+  - Actions: summarize, explain, translate (with a language picker), make flashcards, convert handwriting to text.
+  - States what is sent and shows daily usage; spinner with Cancel; friendly errors (off, quota, too long, timeout, unreachable).
+  - Results render as plain text. Result actions: Copy, Insert into notes, Save as flashcard, and choose a deck for generated cards.
+- **Entry points:**
+  - Dashboard "Ask AI".
+  - Whiteboard sparkle (whole page) and lasso menu (Convert to text, Explain, Translate on the selection only).
+  - Reader: selection menu (Explain, Summarize, Translate), "Make flashcards with AI" from a highlight, and the header "Summarize with AI" (this page or the whole book).
+- **Starter content** (user request): every new account gets 4 subjects and 4 decks with 13 sample cards, created with the account and fully editable. CLAUDE.md §4 now records this exception.
+
+**Bugs found and fixed**
+
+- Notes editor re-applied Tiptap options on every render (new `extensions`/`editorProps` objects); they're now stable.
+- Flaky mobile link test: ProseMirror hadn't yet read the browser's Shift+Home selection when the toolbar was tapped about 50 ms later. Instrumentation showed no remount or remote overwrite. The test now selects with Ctrl/Cmd+A, which the editor handles synchronously. It passed 180 times in a row.
+
+**Tests:** 7 server AI tests (fake provider: auth, quota and refund, size limits, fenced prompts, card parsing, timeouts), prompt unit tests, a starter-content API test, and new e2e scenarios in `tests/e2e/ai.spec.ts` against a second test-only server with a scripted AI (no network). Full e2e suite: 192 passed, 3 skipped by design (mobile duplicates of selection flows).
+
+**Remember:** set a budget alert in Google AI Studio / Cloud for the Gemini key.

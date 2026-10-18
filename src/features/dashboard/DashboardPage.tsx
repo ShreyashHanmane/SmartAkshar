@@ -16,6 +16,7 @@ import { useNotebooks } from '../notebooks/NotebooksProvider';
 import { useNewNotebook } from '../notebooks/NewNotebookProvider';
 import { relativeTime } from '../notebooks/time';
 import { SearchBox } from '../search/SearchBox';
+import { AiPanel } from '../ai/AiPanel';
 import { GoalDialog } from './GoalDialog';
 import {
   type DayPart,
@@ -105,6 +106,7 @@ export function DashboardPage() {
   const notebooks = useNotebooks();
   const openNew = useNewNotebook();
   const [editingGoal, setEditingGoal] = useState(false);
+  const [asking, setAsking] = useState(false);
   // Fixed per mount: relative times and stats don't need per-second updates.
   const [now] = useState(() => Date.now());
   const today = useMemo(() => new Date(now), [now]);
@@ -139,14 +141,7 @@ export function DashboardPage() {
         <div className="hidden w-full max-w-lg md:block">
           <SearchBox />
         </div>
-        <Button
-          variant="secondary"
-          icon="sparkle"
-          aria-disabled="true"
-          title={t('common.comingSoon')}
-          className="cursor-not-allowed opacity-60"
-          onClick={(e) => e.preventDefault()}
-        >
+        <Button variant="secondary" icon="sparkle" onClick={() => setAsking(true)}>
           {t('dashboard.askAi')}
         </Button>
       </div>
@@ -281,6 +276,13 @@ export function DashboardPage() {
       </section>
 
       {editingGoal && <GoalDialog onClose={() => setEditingGoal(false)} />}
+      {asking && (
+        <AiPanel
+          source={{ kind: 'input' }}
+          actions={['explain', 'summarize', 'translate', 'flashcards']}
+          onClose={() => setAsking(false)}
+        />
+      )}
     </div>
   );
 }
