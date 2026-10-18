@@ -146,6 +146,10 @@ const MIGRATIONS: string[] = [
     PRIMARY KEY (user_id, day)
   );
   `,
+  // v4: profile photo (file name of an image owned by the user, or NULL).
+  `
+  ALTER TABLE users ADD COLUMN avatar TEXT;
+  `,
 ];
 
 export type Db = DatabaseSync;

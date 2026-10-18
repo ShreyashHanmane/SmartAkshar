@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { t } from '../../i18n/i18n';
 import { Button } from '../../ui/Button';
 import { Dialog } from '../../ui/Dialog';
+import { ProgressBar } from '../../ui/ProgressBar';
 import { Segmented } from '../../ui/Segmented';
 import { useToast } from '../../ui/Toast';
 import { type Progress, saveFile } from './exporters';
@@ -93,12 +94,7 @@ export function ExportDialog<T extends string>({
         )}
         {running && (
           <div className="flex flex-col gap-2" role="status">
-            <progress
-              className="h-2 w-full accent-primary"
-              max={progress.total}
-              value={progress.done}
-              aria-label={t('export.progress')}
-            />
+            <ProgressBar max={progress.total} value={progress.done} label={t('export.progress')} />
             <span>
               {progress.total > 1
                 ? t('export.pageOf', {

@@ -1,3 +1,4 @@
+import { reportSaves } from '../../app/save/pending';
 import { type History, emptyHistory, record, redo as redoStep, undo as undoStep } from './history';
 import type { Element } from './model';
 import { PAGE_BYTES_LIMIT, retryDelay } from './saveState';
@@ -85,6 +86,10 @@ export class EditorStore {
 
   private emit() {
     this.snapshot = this.build();
+    reportSaves(this, {
+      pending: this.snapshot.dirty + this.snapshot.inFlight,
+      failed: this.snapshot.failed,
+    });
     for (const l of this.listeners) l();
   }
 

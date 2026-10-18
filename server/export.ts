@@ -34,9 +34,12 @@ function niceName(title: string, id: string, ext: string): string {
 
 export function collectUserData(db: Db, uid: string) {
   const all = (sql: string) => db.prepare(sql).all(uid) as Record<string, unknown>[];
-  const user = db.prepare('SELECT username, display_name, created_at FROM users WHERE id = ?').get(uid) as {
+  const user = db
+    .prepare('SELECT username, display_name, avatar, created_at FROM users WHERE id = ?')
+    .get(uid) as {
     username: string;
     display_name: string;
+    avatar: string | null;
     created_at: number;
   };
   const settings = db.prepare('SELECT json FROM settings WHERE user_id = ?').get(uid) as
@@ -75,7 +78,12 @@ export function collectUserData(db: Db, uid: string) {
       format: 'akshar-export',
       version: 1,
       exportedAt: new Date().toISOString(),
-      account: { username: user.username, name: user.display_name, createdAt: user.created_at },
+      account: {
+        username: user.username,
+        name: user.display_name,
+        photo: user.avatar ? `files/images/${user.avatar}` : null,
+        createdAt: user.created_at,
+      },
       settings: settings ? json(settings.json) : null,
       subjects: all(
         'SELECT id, name, color, created_at FROM subjects WHERE user_id = ? ORDER BY created_at',
@@ -158,7 +166,7 @@ data.json      Everything you created: account name, settings, subjects,
                notebooks (whiteboard pages and typed notes), books with their
                highlights, flashcard decks and cards, and study time.
 files/books    The books you uploaded (PDF, EPUB, TXT).
-files/images   Images used in your typed notes. In data.json, notes refer to
+files/images   Your profile photo and the images used in your typed notes. In data.json, notes refer to
                them as /api/files/images/<name>; the same <name> is used here.
 
 Whiteboard pages store strokes in a fixed page space of 1000 x 1414 units.

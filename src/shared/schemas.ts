@@ -40,7 +40,13 @@ export const loginSchema = z.object({
   username: z.string().trim().min(1, 'auth.validation.usernameRequired').max(32),
   password: z.string().min(1, 'auth.validation.passwordRequired').max(128),
 });
-export const userSchema = z.object({ id: idSchema, username: z.string(), displayName: z.string() });
+export const userSchema = z.object({
+  id: idSchema,
+  username: z.string(),
+  displayName: z.string(),
+  /** Profile photo URL (the user's own uploaded image), or null. */
+  avatarUrl: z.string().nullable().catch(null),
+});
 export type User = z.infer<typeof userSchema>;
 
 // --- settings --------------------------------------------------------------

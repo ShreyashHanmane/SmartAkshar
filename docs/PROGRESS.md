@@ -296,3 +296,29 @@
 **Verification beyond the tests:** sample PDFs pass `qpdf --check`; LibreOffice opened the DOCX and converted it to PDF, which rendered correctly; Python's `zipfile` read the ZIPs with no errors.
 
 **Tests:** unit tests for ZIP (CRC, round trip, path safety), PDF (opened with pdf.js: page count, sizes, title), DOCX (package parts, numbering, links, image scaling), notes layout (wrapping, margins, pagination) and CSV (injection, quoting). Server tests for the export cover contents, no secrets, owner-only and session required. E2E (`tests/e2e/export.spec.ts`) downloads each file and opens it: PDF page count and size, PNG pixels, DOCX text, CSV text, ZIP `data.json`. Full e2e suite: 204 passed, 3 skipped by design.
+
+## Module 10: Settings and profile (branch `feat/settings`)
+
+**Status:** complete.
+
+**Done**
+
+- **Appearance** (from Module 2, unchanged): theme, text size, language, whiteboard toolbar side.
+- **Account**, matching the design's Account card:
+  - **Photo:** Change photo / Remove photo. The browser crops the picked image to a 256 px square JPEG, which drops EXIF and GPS data. The server accepts only PNG/JPEG/WebP up to 1 MB, checked by content, and replacing a photo deletes the old file.
+  - **Name:** saved on Enter or when you leave the field.
+  - **Username:** read-only. It stands in for the design's Email field, because local accounts have no email.
+  - **Change password:** current, new and confirm; other sessions are signed out.
+  - **Sign out:** asks first if changes are still waiting to save.
+- **Data:**
+  - **Export ZIP** (Module 9).
+  - **Storage used:** real bytes against the 200 MB limit, with counts and sizes for books and images.
+  - **Sync status:** whether the server is reachable, plus unsaved changes added up from every notes and whiteboard saver (`src/app/save/pending.ts`).
+- **Danger zone:** Delete account. It needs your password, and wrong guesses are rate-limited (10 per 15 minutes, like password changes). It deletes all rows and files, then returns to the login screen.
+- The name and photo stay current across tabs (the `account` live topic).
+
+**Bug found and fixed:** pressing Enter in the Name field did nothing. A form with two text fields and no submit button isn't submitted by the browser, so the field now handles Enter itself. Covered by an e2e test.
+
+**Tests:** 4 server tests (photo set, replace and remove, owner-only access, disguised, oversize and GIF rejected; storage numbers; delete rate limit), a sync-summary unit test, and 4 e2e scenarios on desktop, tablet and mobile. I reviewed screenshots of Settings in light, dark and paper themes at all three sizes.
+
+**Not covered by an automated test:** the sign-out "unsaved changes" warning. It only appears while a save is in flight or failing, which can't be reproduced reliably in e2e; the logic is a single check of the tested sync summary.

@@ -50,6 +50,8 @@ data/            Local database (akshar.db) and uploaded files — gitignored, c
   - Type checked by magic bytes and extension; random names; never overwritten.
   - Served only to their owner, with `Content-Security-Policy: sandbox` and `nosniff`; books as attachments.
 - **Headers:** CSP without `unsafe-eval`, `frame-ancestors 'none'`, nosniff, Referrer-Policy, Permissions-Policy, COOP and CORP.
+- **Profile photo:** one image per user (`users.avatar`, a `files` row with `owner_ref = '@avatar'`), served through the same owner-only image route.
+- **Account deletion:** requires the password (rate-limited) and removes every row and the user's file folder.
 - **Password reset:** `npm run reset-password -- <username>`. It prompts for the new password (hidden) and signs out every session.
 
 ## AI (optional)

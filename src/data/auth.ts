@@ -1,15 +1,22 @@
 import { type User, userSchema } from '../shared/schemas';
 import { ApiError, apiErrorCode, request, send } from './api';
-import { closeEvents } from './events';
+import { closeEvents, live } from './events';
 
 /** The app's view of the signed-in person. */
 export interface SessionUser {
   uid: string;
   username: string;
   displayName: string;
+  /** The user's own profile photo (served only to them), or null. */
+  avatarUrl: string | null;
 }
 
-const toSession = (u: User): SessionUser => ({ uid: u.id, username: u.username, displayName: u.displayName });
+const toSession = (u: User): SessionUser => ({
+  uid: u.id,
+  username: u.username,
+  displayName: u.displayName,
+  avatarUrl: u.avatarUrl,
+});
 
 let current: SessionUser | null | undefined;
 const listeners = new Set<(u: SessionUser | null) => void>();
@@ -66,6 +73,34 @@ export async function changePassword(current: string, next: string): Promise<voi
 
 export async function updateDisplayName(displayName: string): Promise<void> {
   publish(await readUser(await request('PATCH', '/api/account', { json: { displayName } })));
+}
+
+/** Uploads a profile photo (the app sends a small square PNG or JPEG). */
+export async function uploadAvatar(file: Blob, ext: 'png' | 'jpg'): Promise<void> {
+  publish(
+    await readUser(
+      await request('POST', '/api/account/avatar', {
+        body: file,
+        headers: { 'Content-Type': 'application/octet-stream', 'X-File-Name': `photo.${ext}` },
+      }),
+    ),
+  );
+}
+
+export async function removeAvatar(): Promise<void> {
+  publish(await readUser(await request('DELETE', '/api/account/avatar')));
+}
+
+/** Keeps the session's name and photo current when they change in another tab. */
+export function watchAccount(): () => void {
+  return live(
+    async () => readUser(await request('GET', '/api/auth/me')),
+    ['account'],
+    (user) => {
+      if (user && current && user.uid === current.uid) publish(user);
+    },
+    () => undefined,
+  );
 }
 
 export async function deleteAccount(password: string): Promise<void> {

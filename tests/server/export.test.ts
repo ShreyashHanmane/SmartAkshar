@@ -68,6 +68,7 @@ describe('full data export', () => {
     expect(data.account).toEqual({
       username: expect.any(String),
       name: 'Asha',
+      photo: null,
       createdAt: expect.any(Number),
     });
     expect(data.subjects).toHaveLength(4); // starter content

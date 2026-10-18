@@ -3,7 +3,7 @@ import { type SessionState, guardProtected, guardPublicAuth } from './guards';
 
 const signedIn: SessionState = {
   status: 'signedIn',
-  user: { uid: 'u1', username: 'asha', displayName: 'Asha' },
+  user: { uid: 'u1', username: 'asha', displayName: 'Asha', avatarUrl: null },
 };
 const signedOut: SessionState = { status: 'signedOut' };
 const loading: SessionState = { status: 'loading' };
