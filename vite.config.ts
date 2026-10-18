@@ -45,6 +45,10 @@ export default defineConfig({
   build: {
     sourcemap: false,
   },
+  // In development the local API server (npm run dev starts it) answers /api.
+  server: {
+    proxy: { '/api': { target: 'http://127.0.0.1:5174', changeOrigin: false } },
+  },
   test: {
     include: ['src/**/*.test.{ts,tsx}'],
     environment: 'node',

@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { isMobile, nav, openNav, signInAsGuest, storedUid, waitForServerDoc } from './helpers';
+import { apiGet, isMobile, nav, openNav, signOutViaSettings, signUpFresh } from './helpers';
 
 test.beforeEach(async ({ page }) => {
-  await signInAsGuest(page);
+  await signUpFresh(page);
 });
 
 test('navigation reaches every main area', async ({ page }) => {
@@ -47,11 +47,9 @@ test('theme and text size apply instantly and persist across reloads', async ({ 
   await page.keyboard.press('ArrowRight');
   await expect(page.getByRole('radio', { name: 'Right' })).toHaveAttribute('aria-checked', 'true');
 
-  const uid = await storedUid(page);
-  await waitForServerDoc(`users/${uid}`, (d) => {
-    const s = d.settings as Record<string, unknown> | undefined;
-    return s?.theme === 'dark' && s.textSize === 'lg' && s.toolbarSide === 'right';
-  });
+  await expect
+    .poll(() => apiGet(page, '/api/settings'))
+    .toMatchObject({ theme: 'dark', textSize: 'lg', toolbarSide: 'right' });
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await expect(page.locator('html')).toHaveAttribute('data-text-size', 'lg');
@@ -138,8 +136,6 @@ test('signing out resets the theme for the next person', async ({ page }) => {
   await page.goto('/settings');
   await page.getByRole('radio', { name: 'Dark' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await page.getByRole('button', { name: 'Sign out' }).last().click();
-  await page.getByRole('button', { name: 'Sign out and discard' }).click();
-  await expect(page).toHaveURL(/\/login$/);
+  await signOutViaSettings(page);
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 });

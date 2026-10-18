@@ -1,84 +1,11 @@
+import { DatabaseSync } from 'node:sqlite';
+import { resolve } from 'node:path';
 import { type Page, expect } from '@playwright/test';
 
-const AUTH_EMULATOR = 'http://127.0.0.1:9099';
-const PROJECT = 'demo-akshar';
+export const PASSWORD = 'study1234';
 
-export function uniqueEmail(tag: string): string {
-  return `${tag}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
-}
-
-interface OobCode {
-  email: string;
-  requestType: 'VERIFY_EMAIL' | 'PASSWORD_RESET' | string;
-  oobLink: string;
-}
-
-/** Emails the Auth emulator "sent" (the emulator exposes them instead of mailing). */
-export async function oobCodes(email: string): Promise<OobCode[]> {
-  const res = await fetch(`${AUTH_EMULATOR}/emulator/v1/projects/${PROJECT}/oobCodes`);
-  const body = (await res.json()) as { oobCodes: OobCode[] };
-  return body.oobCodes.filter((c) => c.email === email);
-}
-
-export async function verifyEmailViaEmulator(email: string): Promise<void> {
-  await expect
-    .poll(async () => (await oobCodes(email)).some((c) => c.requestType === 'VERIFY_EMAIL'))
-    .toBe(true);
-  const code = (await oobCodes(email)).filter((c) => c.requestType === 'VERIFY_EMAIL').at(-1);
-  if (!code) throw new Error('no verification email');
-  const res = await fetch(code.oobLink);
-  expect(res.ok).toBe(true);
-}
-
-/** Reads the signed-in uid from Firebase's own persistence (IndexedDB) in the page. */
-export async function storedUid(page: Page): Promise<string | null> {
-  return page.evaluate(
-    () =>
-      new Promise<string | null>((resolve) => {
-        const open = indexedDB.open('firebaseLocalStorageDb');
-        open.onerror = () => resolve(null);
-        open.onsuccess = () => {
-          const db = open.result;
-          if (!db.objectStoreNames.contains('firebaseLocalStorage')) return resolve(null);
-          const all = db.transaction('firebaseLocalStorage').objectStore('firebaseLocalStorage').getAll();
-          all.onsuccess = () => {
-            const row = (all.result as { value?: { uid?: string } }[]).find((r) => r.value?.uid);
-            resolve(row?.value?.uid ?? null);
-          };
-          all.onerror = () => resolve(null);
-        };
-      }),
-  );
-}
-
-export async function signUp(page: Page, name: string, email: string, password: string): Promise<void> {
-  await page.goto('/signup');
-  await page.getByLabel('Name').fill(name);
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password', { exact: true }).fill(password);
-  await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page).toHaveURL(/\/verify-email$/);
-}
-
-export async function signUpVerified(
-  page: Page,
-  name: string,
-  email: string,
-  password: string,
-): Promise<void> {
-  await signUp(page, name, email, password);
-  await verifyEmailViaEmulator(email);
-  await confirmVerified(page);
-  await expect(greeting(page, name)).toBeVisible();
-}
-
-/**
- * Presses "I've verified my email" unless a token refresh already moved the app
- * on to the dashboard (both are correct outcomes).
- */
-export async function confirmVerified(page: Page): Promise<void> {
-  const button = page.getByRole('button', { name: "I've verified my email" });
-  await button.click({ timeout: 3000 }).catch(() => undefined);
+export function uniqueName(tag: string): string {
+  return `${tag}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
 /** The dashboard greeting ("Good afternoon, Asha"). */
@@ -89,83 +16,75 @@ export function greeting(page: Page, name: string) {
   });
 }
 
-export async function signIn(page: Page, email: string, password: string): Promise<void> {
+export async function signUpViaUi(page: Page, name: string, username: string, password = PASSWORD) {
+  await page.goto('/signup');
+  await page.getByLabel('Name', { exact: true }).fill(name);
+  await page.getByLabel('Username').fill(username);
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(greeting(page, name)).toBeVisible();
+}
+
+export async function signInViaUi(page: Page, username: string, password = PASSWORD) {
   await page.goto('/login');
-  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Username').fill(username);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 
-export async function signInAsGuest(page: Page): Promise<void> {
-  await page.goto('/login');
-  await page.getByRole('button', { name: 'Continue as guest' }).click();
-  await expect(page).toHaveURL(/\/$/);
+/** Creates a fresh account through the API (fast), signs this browser in, and opens the dashboard. */
+export async function signUpFresh(page: Page, name = 'Asha'): Promise<string> {
+  const username = uniqueName('u');
+  const res = await page.request.post('/api/auth/signup', {
+    headers: { 'X-Akshar': '1' },
+    data: { name, username, password: PASSWORD },
+  });
+  expect(res.status()).toBe(201);
+  await page.goto('/');
+  await expect(greeting(page, name)).toBeVisible();
+  return username;
 }
 
-export function isMobile(page: Page): boolean {
-  return (page.viewportSize()?.width ?? 1024) < 768;
-}
-
-/** Opens the navigation (the drawer on mobile; the sidebar is always visible on larger screens). */
-export async function openNav(page: Page): Promise<void> {
-  if (isMobile(page)) await page.getByRole('button', { name: 'Open menu' }).click();
-}
-
-export function nav(page: Page) {
-  return isMobile(page) ? page.getByRole('dialog', { name: 'Main navigation' }) : page.locator('aside');
-}
-
-/** Sign-out lives in Settings. Guests are asked to confirm. */
-export async function signOutViaSettings(page: Page, { guest = false } = {}): Promise<void> {
+/** Sign-out lives in Settings. */
+export async function signOutViaSettings(page: Page) {
   await page.goto('/settings');
   await page.getByRole('main').getByRole('button', { name: 'Sign out' }).click();
-  if (guest) await page.getByRole('button', { name: 'Sign out and discard' }).click();
   await expect(page).toHaveURL(/\/login$/);
 }
 
-type FsValue =
-  | { nullValue: null }
-  | { booleanValue: boolean }
-  | { integerValue: string }
-  | { doubleValue: number }
-  | { stringValue: string }
-  | { timestampValue: string }
-  | { arrayValue: { values: FsValue[] } }
-  | { mapValue: { fields: Record<string, FsValue> } };
-
-function toFs(value: unknown): FsValue {
-  if (value === null) return { nullValue: null };
-  if (value instanceof Date) return { timestampValue: value.toISOString() };
-  if (typeof value === 'boolean') return { booleanValue: value };
-  if (typeof value === 'number')
-    return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
-  if (typeof value === 'string') return { stringValue: value };
-  if (Array.isArray(value)) return { arrayValue: { values: value.map(toFs) } };
-  return {
-    mapValue: {
-      fields: Object.fromEntries(
-        Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, toFs(v)]),
-      ),
-    },
-  };
+export async function myId(page: Page): Promise<string> {
+  const body = (await (await page.request.get('/api/auth/me')).json()) as { user: { id: string } | null };
+  return body.user?.id ?? '';
 }
 
-/**
- * Writes a document straight into the Firestore emulator (admin bypass, test data only).
- * Used to seed data the UI under test does not create itself.
- */
-export async function seedDoc(path: string, data: Record<string, unknown>): Promise<void> {
-  const res = await fetch(
-    `http://127.0.0.1:8080/v1/projects/demo-akshar/databases/(default)/documents/${path}`,
-    {
-      method: 'PATCH',
-      headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fields: (toFs(data) as { mapValue: { fields: Record<string, FsValue> } }).mapValue.fields,
-      }),
-    },
-  );
-  if (!res.ok) throw new Error(`seed ${path} failed: ${res.status} ${await res.text()}`);
+export async function apiGet<T = unknown>(page: Page, path: string): Promise<T | null> {
+  const res = await page.request.get(path);
+  return res.status() === 404 ? null : ((await res.json()) as T);
+}
+
+export async function apiSend(
+  page: Page,
+  method: 'PUT' | 'POST' | 'PATCH' | 'DELETE',
+  path: string,
+  data?: unknown,
+) {
+  const res = await page.request.fetch(path, {
+    method,
+    headers: { 'X-Akshar': '1' },
+    ...(data === undefined ? {} : { data }),
+  });
+  expect(res.ok(), `${method} ${path} -> ${res.status()}`).toBe(true);
+}
+
+/** Writes straight into the e2e database (test data only, e.g. past study time). */
+export function dbRun(sql: string, ...params: (string | number | null)[]) {
+  const db = new DatabaseSync(resolve('.tmp-test/e2e/akshar.db'));
+  try {
+    db.exec('PRAGMA busy_timeout = 3000');
+    db.prepare(sql).run(...params);
+  } finally {
+    db.close();
+  }
 }
 
 export function localDayKey(date: Date): string {
@@ -187,17 +106,31 @@ export function packPoints(points: [number, number][]): string {
   return buf.toString('base64');
 }
 
+export function isMobile(page: Page): boolean {
+  return (page.viewportSize()?.width ?? 1024) < 768;
+}
+
+/** Opens the navigation (the drawer on mobile; the sidebar is always visible on larger screens). */
+export async function openNav(page: Page): Promise<void> {
+  if (isMobile(page)) await page.getByRole('button', { name: 'Open menu' }).click();
+}
+
+export function nav(page: Page) {
+  return isMobile(page) ? page.getByRole('dialog', { name: 'Main navigation' }) : page.locator('aside');
+}
+
 export async function createNotebookViaUi(page: Page, title: string, subject?: string): Promise<string> {
-  const dialogOpeners = page.getByRole('button', { name: /^(New notebook|Create notebook)/ });
-  await dialogOpeners.first().click();
+  await page
+    .getByRole('button', { name: /^(New notebook|Create notebook)/ })
+    .first()
+    .click();
   const dialog = page.getByRole('dialog', { name: 'New notebook' });
   await dialog.getByLabel('Title').fill(title);
   if (subject) await dialog.getByLabel('Subject').selectOption({ label: subject });
   await dialog.getByRole('button', { name: 'Create notebook' }).click();
-  await expect(page).toHaveURL(/\/notebooks\/[A-Za-z0-9]+$/);
+  await expect(page).toHaveURL(/\/notebooks\/[A-Za-z0-9_-]+$/);
   const id = page.url().split('/').pop() as string;
-  const uid = await storedUid(page);
-  await waitForServerDoc(`users/${uid}/notebooks/${id}`);
+  await expect.poll(async () => (await apiGet(page, `/api/notebooks/${id}`)) !== null).toBe(true);
   return id;
 }
 
@@ -209,38 +142,4 @@ export async function addSubjectViaUi(page: Page, name: string): Promise<void> {
   await page.getByRole('button', { name: 'Create subject' }).click();
   await expect(n.getByRole('link', { name: new RegExp(`^${name}`) })).toBeVisible();
   if (isMobile(page)) await page.getByRole('button', { name: 'Close menu' }).click();
-}
-
-/** Reads a document from the Firestore emulator (admin bypass) as plain JSON-ish values. */
-export async function readDoc(path: string): Promise<Record<string, unknown> | null> {
-  const res = await fetch(
-    `http://127.0.0.1:8080/v1/projects/demo-akshar/databases/(default)/documents/${path}`,
-    {
-      headers: { Authorization: 'Bearer owner' },
-    },
-  );
-  if (res.status === 404) return null;
-  const body = (await res.json()) as { fields?: Record<string, FsValue> };
-  const fromFs = (v: FsValue): unknown => {
-    if ('mapValue' in v)
-      return Object.fromEntries(Object.entries(v.mapValue.fields ?? {}).map(([k, x]) => [k, fromFs(x)]));
-    if ('arrayValue' in v) return (v.arrayValue.values ?? []).map(fromFs);
-    if ('integerValue' in v) return Number(v.integerValue);
-    if ('nullValue' in v) return null;
-    return Object.values(v)[0];
-  };
-  return Object.fromEntries(Object.entries(body.fields ?? {}).map(([k, v]) => [k, fromFs(v)]));
-}
-
-/** Waits until a document exists on the server (so a full reload can't race the sync). */
-export async function waitForServerDoc(
-  path: string,
-  check: (d: Record<string, unknown>) => boolean = () => true,
-) {
-  await expect
-    .poll(async () => {
-      const d = await readDoc(path);
-      return d !== null && check(d);
-    })
-    .toBe(true);
 }

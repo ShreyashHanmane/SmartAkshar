@@ -1,28 +1,24 @@
 import { type Page, expect, test } from '@playwright/test';
-import {
-  createNotebookViaUi,
-  isMobile,
-  packPoints,
-  readDoc,
-  seedDoc,
-  signInAsGuest,
-  storedUid,
-  waitForServerDoc,
-} from './helpers';
+import { apiGet, apiSend, createNotebookViaUi, isMobile, packPoints, signUpFresh } from './helpers';
 
-let uid = '';
 let notebookId = '';
+let current: Page;
 
 test.beforeEach(async ({ page }) => {
-  await signInAsGuest(page);
-  uid = (await storedUid(page)) ?? '';
+  current = page;
+  await signUpFresh(page);
   notebookId = await createNotebookViaUi(page, 'Newton’s Laws');
   await expect(page.getByRole('img', { name: /Page 1 of 1/ })).toBeVisible();
 });
 
-const pagePath = (id = 'p0') => `users/${uid}/notebooks/${notebookId}/pages/${id}`;
-const elementsOf = async (id = 'p0') =>
-  ((await readDoc(pagePath(id)))?.elements as Record<string, unknown>[] | undefined) ?? [];
+type ApiPage = { id: string; index: number; elements: Record<string, unknown>[] };
+const pagesOf = async () => (await apiGet<ApiPage[]>(current, `/api/notebooks/${notebookId}/pages`)) ?? [];
+const elementsOf = async (index = 0) => (await pagesOf()).find((p) => p.index === index)?.elements ?? [];
+const notebookOf = async () =>
+  (await apiGet<Record<string, unknown>>(current, `/api/notebooks/${notebookId}`)) ?? {};
+async function waitForNotebook(check: (d: Record<string, unknown>) => boolean) {
+  await expect.poll(async () => check(await notebookOf())).toBe(true);
+}
 
 /** Draws a polyline on the page using fractions of the canvas box (0..1). */
 async function draw(page: Page, points: [number, number][]) {
@@ -184,7 +180,12 @@ test('lasso selects, moves, and erases; AI actions wait for the AI module', asyn
 test('pages: add, navigate, and the page count is saved', async ({ page }) => {
   await page.getByRole('button', { name: 'Add page' }).click();
   await expect(page.getByText('Page 2 of 2')).toBeVisible();
-  await waitForServerDoc(`users/${uid}/notebooks/${notebookId}`, (d) => d.pageCount === 2);
+  await expect
+    .poll(async () => {
+      const d = await notebookOf();
+      return d.pageCount === 2;
+    })
+    .toBe(true);
   await page.getByRole('button', { name: 'Previous page' }).click();
   await expect(page.getByText('Page 1 of 2')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Previous page' })).toBeDisabled();
@@ -207,10 +208,7 @@ test('switching Paged ↔ Infinite keeps all content and is saved per notebook',
 
   await page.getByRole('radio', { name: 'Infinite' }).click();
   await expect(page.getByRole('img', { name: 'Infinite canvas, 2 items' })).toBeVisible();
-  await waitForServerDoc(
-    `users/${uid}/notebooks/${notebookId}`,
-    (d) => d.mode === 'infinite' && d.pageCount === 1,
-  );
+  await waitForNotebook((d) => d.mode === 'infinite' && d.pageCount === 1);
   expect((await elementsOf()).length).toBe(2);
 
   await page.reload();
@@ -218,10 +216,7 @@ test('switching Paged ↔ Infinite keeps all content and is saved per notebook',
 
   await page.getByRole('radio', { name: 'Paged' }).click();
   await expect(page.getByText('Page 1 of 2')).toBeVisible();
-  await waitForServerDoc(
-    `users/${uid}/notebooks/${notebookId}`,
-    (d) => d.mode === 'paged' && d.pageCount === 2,
-  );
+  await waitForNotebook((d) => d.mode === 'paged' && d.pageCount === 2);
 });
 
 test('paper style and background are saved per notebook', async ({ page }) => {
@@ -230,10 +225,7 @@ test('paper style and background are saved per notebook', async ({ page }) => {
   await panel.getByText('Grid').click();
   await panel.locator('label', { hasText: 'Cream' }).click();
   await panel.getByRole('button', { name: 'Done' }).click();
-  await waitForServerDoc(
-    `users/${uid}/notebooks/${notebookId}`,
-    (d) => d.paper === 'grid' && d.background === 'cream',
-  );
+  await waitForNotebook((d) => d.paper === 'grid' && d.background === 'cream');
 });
 
 test('toolbar docks, collapses, and remembers its position', async ({ page }) => {
@@ -285,7 +277,7 @@ test('rename, focus mode, and delete from the menu', async ({ page }) => {
     .getByRole('button', { name: 'Delete' })
     .click();
   await expect(page).toHaveURL(/\/notebooks$/);
-  expect(await readDoc(`users/${uid}/notebooks/${notebookId}`)).toBeNull();
+  expect(await apiGet(page, `/api/notebooks/${notebookId}`)).toBeNull();
 });
 
 test('palm rejection: touches never draw once a stylus is in use', async ({ page }) => {
@@ -322,7 +314,9 @@ test('offline edits show Offline, then sync when back online', async ({ page, co
     [0.3, 0.3],
     [0.6, 0.4],
   ]);
-  await expect(page.getByRole('status').filter({ hasText: 'Offline · saved on this device' })).toBeVisible();
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Server unreachable · not saved yet' }),
+  ).toBeVisible();
   await context.setOffline(false);
   await expect(page.getByRole('status').filter({ hasText: /^Saved$/ })).toBeVisible({ timeout: 20_000 });
   await expect.poll(async () => (await elementsOf()).length, { timeout: 20_000 }).toBe(1);
@@ -344,7 +338,7 @@ test('stays responsive with 1000+ strokes', async ({ page }) => {
       ),
     ),
   }));
-  await seedDoc(pagePath(), { index: 0, elements: strokes, updatedAt: new Date() });
+  await apiSend(page, 'PUT', `/api/notebooks/${notebookId}/pages/p0`, { index: 0, elements: strokes });
   await expect(page.getByRole('img', { name: 'Page 1 of 1, 1200 items' })).toBeVisible();
 
   const t0 = Date.now();

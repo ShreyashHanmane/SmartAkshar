@@ -1,7 +1,7 @@
 import { type Page, expect, test } from '@playwright/test';
-import { createNotebookViaUi, readDoc, signInAsGuest, storedUid } from './helpers';
+import { apiGet, createNotebookViaUi, signUpFresh } from './helpers';
 
-let uid = '';
+let current: Page;
 let notebookId = '';
 const PNG_1PX = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
@@ -9,8 +9,8 @@ const PNG_1PX = Buffer.from(
 );
 
 test.beforeEach(async ({ page }) => {
-  await signInAsGuest(page);
-  uid = (await storedUid(page)) ?? '';
+  current = page;
+  await signUpFresh(page);
   notebookId = await createNotebookViaUi(page, 'Kinematics');
   await page.getByRole('radio', { name: 'Notes' }).click();
   await expect(page).toHaveURL(/view=notes/);
@@ -18,8 +18,10 @@ test.beforeEach(async ({ page }) => {
 });
 
 const editor = (page: Page) => page.getByRole('textbox', { name: 'Notes' });
-const notePath = () => `users/${uid}/notebooks/${notebookId}/notes/main`;
-const noteJson = async () => JSON.stringify((await readDoc(notePath()))?.content ?? null);
+const noteJson = async () =>
+  JSON.stringify(
+    (await apiGet<{ content: unknown }>(current, `/api/notebooks/${notebookId}/note`))?.content ?? null,
+  );
 const fmt = (page: Page, name: string) =>
   page.getByRole('toolbar', { name: 'Formatting' }).getByRole('button', { name, exact: true });
 
@@ -107,8 +109,8 @@ test('images upload to the user’s own storage; disguised files are rejected', 
   await expect(img).toHaveCount(1);
   await expect(img).toHaveAttribute('alt', 'diagram');
   const src = (await img.getAttribute('src')) ?? '';
-  expect(src).toContain(`users%2F${uid}%2Fnotes%2F${notebookId}%2F`);
-  await expect.poll(noteJson).toContain(`users%2F${uid}%2Fnotes`);
+  expect(src).toMatch(/^\/api\/files\/images\/[0-9a-f]{32}\.png$/);
+  await expect.poll(noteJson).toContain(src);
 
   await input.setInputFiles({
     name: 'evil.png',
@@ -126,7 +128,7 @@ test('deleting the notebook removes its notes and images', async ({ page }) => {
     .locator('input[type="file"]')
     .setInputFiles({ name: 'a.png', mimeType: 'image/png', buffer: PNG_1PX });
   await expect(editor(page).locator('img')).toHaveCount(1);
-  await expect.poll(noteJson).toContain('notes%2F');
+  await expect.poll(noteJson).toContain('/api/files/images/');
   const src = (await editor(page).locator('img').getAttribute('src')) ?? '';
 
   await page.getByRole('button', { name: 'More options' }).click();
@@ -140,9 +142,8 @@ test('deleting the notebook removes its notes and images', async ({ page }) => {
     .getByRole('button', { name: 'Delete' })
     .click();
   await expect(page).toHaveURL(/\/notebooks$/);
-  expect(await readDoc(notePath())).toBeNull();
-  const res = await fetch(src.replace(/token=[^&]+/, ''), { headers: { Authorization: 'Bearer owner' } });
-  expect(res.status).toBe(404);
+  expect(await apiGet(page, `/api/notebooks/${notebookId}/note`)).toBeNull();
+  expect((await page.request.get(src)).status()).toBe(404);
 });
 
 test('switching back to the whiteboard keeps the notebook', async ({ page }) => {

@@ -4,10 +4,12 @@ dist/
 coverage/
 *.tsbuildinfo
 
+# Local data (the app's database and uploaded files) and test data
+data/
+.tmp-test/
+
 # Local caches (kept inside the project on purpose)
 .npm-cache/
-.emulators/
-.config-local/
 .cache/
 
 # Test reports
@@ -25,14 +27,6 @@ blob-report/
 service-account*.json
 serviceAccount*.json
 
-# Firebase
-firebase-debug.log
-firestore-debug.log
-storage-debug.log
-ui-debug.log
-database-debug.log
-pubsub-debug.log
-.firebase/
 
 # Editors / OS
 .DS_Store

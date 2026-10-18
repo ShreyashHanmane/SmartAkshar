@@ -4,7 +4,7 @@ const PORT = 4173;
 
 export default defineConfig({
   testDir: 'tests/e2e',
-  // Three browsers share the local emulators; allow for a loaded machine.
+  // Three browsers share one local server; allow for a loaded machine.
   expect: { timeout: 10_000 },
   forbidOnly: !!process.env.CI,
   reporter: [['list']],
@@ -21,8 +21,8 @@ export default defineConfig({
     { name: 'mobile', use: { ...devices['Pixel 7'] } },
   ],
   webServer: {
-    // Production build wired to the local emulators (demo project, never real Firebase).
-    command: `VITE_USE_EMULATORS=true npm run build && npx vite preview --port ${PORT} --strictPort`,
+    // Production build served by the real local server, with a fresh data folder.
+    command: `npm run build && rm -rf .tmp-test/e2e && AKSHAR_DATA_DIR=.tmp-test/e2e PORT=${PORT} node server/index.ts`,
     port: PORT,
     reuseExistingServer: false,
     timeout: 120_000,

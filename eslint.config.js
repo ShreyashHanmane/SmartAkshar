@@ -9,8 +9,8 @@ export default tseslint.config(
       'coverage',
       'node_modules',
       '.npm-cache',
-      '.emulators',
-      '.config-local',
+      'data',
+      '.tmp-test',
       'playwright-report',
       'test-results',
     ],
@@ -22,6 +22,11 @@ export default tseslint.config(
     plugins: { 'react-hooks': reactHooks },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // Leading underscore marks parameters kept for a stable signature.
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_' },
+      ],
       'no-restricted-syntax': [
         'error',
         {
@@ -33,21 +38,16 @@ export default tseslint.config(
           message: 'Do not assign innerHTML/outerHTML (CLAUDE.md §7.4).',
         },
       ],
-      'no-restricted-imports': [
+      'no-restricted-globals': [
         'error',
-        {
-          patterns: [
-            {
-              group: ['firebase/*', '!firebase/app'],
-              message: 'Firebase access goes through src/data only (CLAUDE.md §8).',
-            },
-          ],
-        },
+        { name: 'fetch', message: 'Talk to the server through src/data only (CLAUDE.md §8).' },
+        { name: 'XMLHttpRequest', message: 'Talk to the server through src/data only (CLAUDE.md §8).' },
+        { name: 'EventSource', message: 'Talk to the server through src/data only (CLAUDE.md §8).' },
       ],
     },
   },
   {
-    files: ['src/data/**/*.ts', 'tests/**/*.ts'],
-    rules: { 'no-restricted-imports': 'off' },
+    files: ['src/data/**/*.ts', 'tests/**/*.ts', 'server/**/*.ts', 'scripts/**/*.ts'],
+    rules: { 'no-restricted-globals': 'off' },
   },
 );

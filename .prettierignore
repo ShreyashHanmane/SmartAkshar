@@ -2,8 +2,8 @@ node_modules
 dist
 coverage
 .npm-cache
-.emulators
-.config-local
+data
+.tmp-test
 package-lock.json
 playwright-report
 test-results

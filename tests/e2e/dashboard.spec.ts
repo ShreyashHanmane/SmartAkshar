@@ -1,20 +1,21 @@
 import { expect, test } from '@playwright/test';
 import {
   addSubjectViaUi,
+  apiSend,
   createNotebookViaUi,
+  dbRun,
   greeting,
   isMobile,
   localDayKey,
+  myId,
   nav,
   openNav,
   packPoints,
-  seedDoc,
-  signInAsGuest,
-  storedUid,
+  signUpFresh,
 } from './helpers';
 
 test.beforeEach(async ({ page }) => {
-  await signInAsGuest(page);
+  await signUpFresh(page, 'Guest');
 });
 
 test('a new account sees real, empty stats and helpful empty states', async ({ page }) => {
@@ -73,7 +74,6 @@ test('create, rename, and delete a notebook', async ({ page }) => {
 });
 
 test('thumbnails preview the first page; empty notebooks show a placeholder', async ({ page }) => {
-  const uid = await storedUid(page);
   const id = await createNotebookViaUi(page, 'Waves');
   await page.goto('/');
   const card = page.getByRole('article').filter({ hasText: 'Waves' });
@@ -82,9 +82,8 @@ test('thumbnails preview the first page; empty notebooks show a placeholder', as
   await expect(card.getByText('Waves')).toBeVisible();
   await expect(card.locator('canvas')).toBeHidden();
 
-  await seedDoc(`users/${uid}/notebooks/${id}/pages/p0`, {
+  await apiSend(page, 'PUT', `/api/notebooks/${id}/pages/p0`, {
     index: 0,
-    updatedAt: new Date(),
     elements: [
       {
         k: 's',
@@ -117,14 +116,14 @@ test('thumbnails preview the first page; empty notebooks show a placeholder', as
 });
 
 test('stats come from tracked study time and due cards', async ({ page }) => {
-  const uid = await storedUid(page);
+  const uid = await myId(page);
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
-  await seedDoc(`users/${uid}/activity/${localDayKey(today)}`, { seconds: 3600, updatedAt: new Date() });
-  await seedDoc(`users/${uid}/activity/${localDayKey(yesterday)}`, { seconds: 1800, updatedAt: new Date() });
-  await seedDoc(`users/${uid}/cards/c1`, { due: new Date(Date.now() - 3600_000) });
-  await seedDoc(`users/${uid}/cards/c2`, { due: new Date(Date.now() + 7 * 24 * 3600_000) });
+  dbRun('INSERT INTO activity (user_id, day, seconds) VALUES (?, ?, 3600)', uid, localDayKey(today));
+  dbRun('INSERT INTO activity (user_id, day, seconds) VALUES (?, ?, 1800)', uid, localDayKey(yesterday));
+  dbRun('INSERT INTO cards (user_id, id, due) VALUES (?, ?, ?)', uid, 'c1', Date.now() - 3600_000);
+  dbRun('INSERT INTO cards (user_id, id, due) VALUES (?, ?, ?)', uid, 'c2', Date.now() + 7 * 24 * 3600_000);
   await page.reload();
 
   // Monday-start week: yesterday only counts if it is in the same week.
