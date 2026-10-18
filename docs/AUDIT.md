@@ -6,33 +6,33 @@ Status: works / broken / UI-only / missing / disabled (Coming soon). "Module" re
 
 ## Shared shell (sidebar; mobile tab bar)
 
-| Element                               | Expected behavior                                        | Status                                                                                 | Module | Target file                             |
-| ------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------ | --------------------------------------- |
-| Logo + tagline                        | Original Figma logo; recolored in dark                   | missing (SVG needed)                                                                   | 2      | `src/ui/Logo.tsx`                       |
-| Dashboard nav                         | Go to dashboard; active state                            | works                                                                                  | 2      | `src/app/shell/Sidebar.tsx`             |
-| Whiteboard nav                        | Go to notebooks/whiteboard                               | works (opens the notebooks area; list built in Module 3)                               | 2      | `src/app/shell/Sidebar.tsx`             |
-| Flashcards nav + due badge            | Go to flashcards; badge = real due-today count           | works for navigation; due badge missing (Module 7)                                     | 2, 7   | `src/app/shell/Sidebar.tsx`             |
-| Library nav                           | Go to library                                            | works (page built in Module 6)                                                         | 2      | `src/app/shell/Sidebar.tsx`             |
-| Subjects list (dot, name, count)      | Filter by subject; counts from data                      | works (list, colour dot, filter link); counts missing until notebooks exist (Module 3) | 2      | `src/features/subjects/SubjectsNav.tsx` |
-| Subject create / rename / delete      | Manage subjects (§9.2)                                   | works                                                                                  | 2      | `src/features/subjects/`                |
-| + New notebook                        | Dialog asking only title + subject                       | disabled (Coming soon) until Module 3                                                  | 3      | `src/app/shell/NewNotebookButton.tsx`   |
-| Settings                              | Go to settings                                           | works                                                                                  | 2      | `src/app/shell/Sidebar.tsx`             |
-| Mobile bottom tabs + floating "+ New" | Home, Whiteboard, Flashcards, Profile; hidden in editors | works (tabs, drawer with full sidebar); "+ New" disabled until Module 3                | 2      | `src/app/shell/MobileBars.tsx`          |
+| Element                               | Expected behavior                                        | Status                                                   | Module | Target file                                      |
+| ------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------- | ------ | ------------------------------------------------ |
+| Logo + tagline                        | Original Figma logo; recolored in dark                   | missing (SVG needed)                                     | 2      | `src/ui/Logo.tsx`                                |
+| Dashboard nav                         | Go to dashboard; active state                            | works                                                    | 2      | `src/app/shell/Sidebar.tsx`                      |
+| Whiteboard nav                        | Go to notebooks/whiteboard                               | works (opens the notebooks area; list built in Module 3) | 2      | `src/app/shell/Sidebar.tsx`                      |
+| Flashcards nav + due badge            | Go to flashcards; badge = real due-today count           | works for navigation; due badge missing (Module 7)       | 2, 7   | `src/app/shell/Sidebar.tsx`                      |
+| Library nav                           | Go to library                                            | works (page built in Module 6)                           | 2      | `src/app/shell/Sidebar.tsx`                      |
+| Subjects list (dot, name, count)      | Filter by subject; counts from data                      | works (list, colour dot, count, filter link)             | 2      | `src/features/subjects/SubjectsNav.tsx`          |
+| Subject create / rename / delete      | Manage subjects (§9.2)                                   | works                                                    | 2      | `src/features/subjects/`                         |
+| + New notebook                        | Dialog asking only title + subject                       | works (title + subject only)                             | 3      | `src/features/notebooks/NewNotebookProvider.tsx` |
+| Settings                              | Go to settings                                           | works                                                    | 2      | `src/app/shell/Sidebar.tsx`                      |
+| Mobile bottom tabs + floating "+ New" | Home, Whiteboard, Flashcards, Profile; hidden in editors | works                                                    | 2      | `src/app/shell/MobileBars.tsx`                   |
 
 ## Dashboard (`dashboard-desktop-light.png`)
 
-| Element                     | Expected behavior                                             | Status                                                                  | Module | Target file                         |
-| --------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------- | ------ | ----------------------------------- |
-| Search field                | Global search over notebooks, PDFs, flashcards                | works (subjects now; notebooks, books, decks as their modules add them) | 2      | `src/features/search/SearchBox.tsx` |
-| Ask AI                      | Opens the AI panel (server-side AI)                           | missing                                                                 | 8      | `src/features/ai/`                  |
-| Greeting + date + name      | Time-of-day greeting, localized date, user name               | missing                                                                 | 3      | `src/features/dashboard/`           |
-| This week: hours focused    | From real tracked usage                                       | missing                                                                 | 3      | same                                |
-| Flashcards due + Review now | Real due count; starts review                                 | missing                                                                 | 3, 7   | same                                |
-| Weekly goal ring + streak   | Computed from real usage                                      | missing                                                                 | 3      | same                                |
-| Recent notebook cards       | Open notebook; live first-page preview or subject placeholder | missing                                                                 | 3      | `src/features/notebooks/`           |
-| Notebook rename / delete    | Per §9.3 (no menu visible in capture)                         | missing                                                                 | 3      | same                                |
-| Create notebook card        | Same dialog as "+ New notebook"                               | missing                                                                 | 3      | same                                |
-| Recent PDFs and books       | Required by §5; not visible in capture (below fold?)          | missing                                                                 | 3      | same                                |
+| Element                     | Expected behavior                                             | Status                                                                  | Module | Target file                                  |
+| --------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------- | ------ | -------------------------------------------- |
+| Search field                | Global search over notebooks, PDFs, flashcards                | works (subjects now; notebooks, books, decks as their modules add them) | 2      | `src/features/search/SearchBox.tsx`          |
+| Ask AI                      | Opens the AI panel (server-side AI)                           | disabled (Coming soon) until Module 8                                   | 8      | `src/features/dashboard/DashboardPage.tsx`   |
+| Greeting + date + name      | Time-of-day greeting, localized date, user name               | works                                                                   | 3      | `src/features/dashboard/DashboardPage.tsx`   |
+| This week: hours focused    | From real tracked usage                                       | works (real tracked study time)                                         | 3      | `src/features/dashboard/stats.ts`            |
+| Flashcards due + Review now | Real due count; starts review                                 | works (real due count; review screen in Module 7)                       | 3, 7   | `src/features/dashboard/DashboardPage.tsx`   |
+| Weekly goal ring + streak   | Computed from real usage                                      | works (real usage; goal editable)                                       | 3      | `src/features/dashboard/stats.ts`            |
+| Recent notebook cards       | Open notebook; live first-page preview or subject placeholder | works (live first-page preview or subject placeholder)                  | 3      | `src/features/notebooks/NotebookCard.tsx`    |
+| Notebook rename / delete    | Per §9.3 (no menu visible in capture)                         | works (card menu)                                                       | 3      | `src/features/notebooks/NotebookDialogs.tsx` |
+| Create notebook card        | Same dialog as "+ New notebook"                               | works                                                                   | 3      | `src/features/notebooks/NotebookCard.tsx`    |
+| Recent PDFs and books       | Required by §5; not visible in capture (below fold?)          | works (real list and empty state; import in Module 6)                   | 3      | `src/features/dashboard/DashboardPage.tsx`   |
 
 ## Whiteboard (`whiteboard-desktop-light.png`)
 

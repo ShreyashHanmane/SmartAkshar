@@ -97,3 +97,30 @@
 
 - Subject counts and the flashcards due badge arrive with notebooks (Module 3) and decks (Module 7).
 - Deleting a subject while offline fails with an error toast (it has to query notebooks and decks first). Module 11 revisits this with offline persistence.
+
+## Module 3: Dashboard (branch `feat/dashboard`)
+
+**Status:** complete.
+
+**Done**
+
+- Dashboard matching the design: search, Ask AI (disabled until Module 8), localized date, time-of-day greeting with the name in accent colour, three stat cards, Recent notebooks (count, grid, dashed "Create notebook" card), Recent PDFs and books.
+- Stats from real tracked usage. `useStudyTracker` counts visible, active time (idle after 2 minutes) on study screens and saves it per local day with capped increments. Focus hours this week (Monday start), study streak (days with at least 5 minutes; today still counts as yesterday's streak until the day ends), and the weekly goal ring (goal editable, 1–80 hours, saved in settings).
+- Flashcards due: live count of cards due by the end of today; "Review now" appears only when there are cards due.
+- Notebooks: create (title + subject only), rename, delete (removes every page), from the sidebar, FAB, dashboard and notebooks page. The `/notebooks` page has subject filter chips (only the user's own subject ids are accepted from the URL). Sidebar subject counts are live.
+- Live thumbnails: the first page is rendered from the real stroke data with the paper style. Empty notebooks show a subject-coloured placeholder with an icon. Thumbnails load lazily when scrolled into view and redraw on resize.
+- Whiteboard document model (used by Module 4): fixed logical page 1000×1414, compact stroke storage (Int16 deltas + base64, about 6 bytes per point), RDP simplification, a renderer with pressure-width pen, flat highlighter, shapes, wrapped text, and paper styles.
+- Firestore: persistent offline cache enabled now (pending writes survive reloads; cleared on sign-out). Rules for notebooks, pages, activity (1–120-second increments only), and read-only cards. 16 rules tests in total.
+
+**Decisions**
+
+- Flashcards are stored flat in `users/{uid}/cards` with a `deckId`, so "due today" is one query.
+- Persistent Firestore cache brought forward from Module 11, because reloading before a write synced could lose it.
+- Verification check made fail-safe: password accounts must verify unless Google is linked, even if provider data is briefly empty.
+- Fixed: closing a dialog opened from the mobile drawer also closed the drawer (React forwards `close` events from nested dialogs).
+- Playwright assertion timeout raised to 10 s: under three parallel browsers the Auth emulator occasionally takes longer than 5 s to restore a session. Measured reloads take 50–400 ms when idle.
+
+**Open issues**
+
+- The whiteboard editor route (`/notebooks/:id`) shows a coming-soon page until Module 4 (next).
+- Typed-text fonts: serif and handwriting fonts are not yet self-hosted (decided in Module 4).
