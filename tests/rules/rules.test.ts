@@ -274,6 +274,72 @@ describe('notes', () => {
   });
 });
 
+const book = (patch: Record<string, unknown> = {}) => ({
+  title: 'Mechanics',
+  author: 'HC Verma',
+  format: 'pdf',
+  size: 1000,
+  storagePath: `users/alice/books/${'a'.repeat(32)}.pdf`,
+  pageCount: 48,
+  progress: 0,
+  position: {},
+  notebookId: null,
+  createdAt: serverTimestamp(),
+  openedAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+  ...patch,
+});
+
+describe('books and highlights', () => {
+  it('lets the owner create a valid book and update its progress', async () => {
+    await assertSucceeds(setDoc(doc(alice(), 'users/alice/books/b1'), book()));
+    await assertSucceeds(
+      updateDoc(doc(alice(), 'users/alice/books/b1'), {
+        progress: 0.5,
+        position: { page: 24 },
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('rejects books pointing at other users’ files, bad formats, or changed paths', async () => {
+    await assertFails(
+      setDoc(
+        doc(alice(), 'users/alice/books/b1'),
+        book({ storagePath: `users/bob/books/${'a'.repeat(32)}.pdf` }),
+      ),
+    );
+    await assertFails(setDoc(doc(alice(), 'users/alice/books/b1'), book({ format: 'exe' })));
+    await assertFails(setDoc(doc(alice(), 'users/alice/books/b1'), book({ progress: 2 })));
+    await assertFails(setDoc(doc(alice(), 'users/alice/books/b1'), book({ position: { evil: 1 } })));
+    await assertSucceeds(setDoc(doc(alice(), 'users/alice/books/b2'), book()));
+    await assertFails(
+      updateDoc(doc(alice(), 'users/alice/books/b2'), {
+        storagePath: `users/alice/books/${'b'.repeat(32)}.pdf`,
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('validates highlights and denies other users', async () => {
+    const h = (patch: Record<string, unknown> = {}) => ({
+      section: 3,
+      exact: 'F = ma',
+      prefix: '',
+      suffix: '',
+      createdAt: serverTimestamp(),
+      ...patch,
+    });
+    await assertSucceeds(setDoc(doc(alice(), 'users/alice/books/b1/highlights/h1'), h()));
+    await assertFails(setDoc(doc(alice(), 'users/alice/books/b1/highlights/h2'), h({ exact: '' })));
+    await assertFails(
+      setDoc(doc(alice(), 'users/alice/books/b1/highlights/h3'), h({ exact: 'x'.repeat(2001) })),
+    );
+    await assertFails(setDoc(doc(bob(), 'users/alice/books/b1/highlights/h4'), h()));
+    await assertFails(getDoc(doc(bob(), 'users/alice/books/b1')));
+  });
+});
+
 const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const name = 'a'.repeat(32);
 
@@ -338,6 +404,48 @@ describe('storage rules', () => {
     );
     await assertSucceeds(
       uploadBytes(ref(guest, `users/gina/notes/n1/${name}.png`), png, { contentType: 'image/png' }),
+    );
+  });
+
+  it('accepts books within limits and rejects mismatched types and oversize files', async () => {
+    const pdf = new TextEncoder().encode('%PDF-1.7');
+    const account = env
+      .authenticatedContext('alice', { firebase: { sign_in_provider: 'password' } })
+      .storage();
+    await assertSucceeds(
+      uploadBytes(ref(account, `users/alice/books/${name}.pdf`), pdf, { contentType: 'application/pdf' }),
+    );
+    await assertFails(
+      uploadBytes(ref(account, `users/alice/books/${'d'.repeat(32)}.pdf`), pdf, {
+        contentType: 'text/plain',
+      }),
+    );
+    await assertFails(
+      uploadBytes(ref(account, `users/alice/books/${'d'.repeat(32)}.html`), pdf, {
+        contentType: 'text/html',
+      }),
+    );
+    await assertFails(
+      uploadBytes(
+        ref(account, `users/alice/books/${'e'.repeat(32)}.pdf`),
+        new Uint8Array(25 * 1024 * 1024 + 1),
+        {
+          contentType: 'application/pdf',
+        },
+      ),
+    );
+    const guest = env.authenticatedContext('gina', { firebase: { sign_in_provider: 'anonymous' } }).storage();
+    await assertFails(
+      uploadBytes(ref(guest, `users/gina/books/${name}.pdf`), new Uint8Array(5 * 1024 * 1024 + 1), {
+        contentType: 'application/pdf',
+      }),
+    );
+    await assertFails(
+      uploadBytes(
+        ref(env.authenticatedContext('bob').storage(), `users/alice/books/${'f'.repeat(32)}.pdf`),
+        pdf,
+        { contentType: 'application/pdf' },
+      ),
     );
   });
 

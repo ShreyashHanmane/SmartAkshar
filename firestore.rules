@@ -126,7 +126,39 @@ service cloud.firestore {
       }
 
       match /books/{bookId} {
-        allow read: if isOwner(uid);
+        function validBook(d) {
+          return d.keys().hasOnly(['title', 'author', 'format', 'size', 'storagePath', 'pageCount', 'progress', 'position',
+              'notebookId', 'createdAt', 'openedAt', 'updatedAt'])
+            && d.keys().hasAll(['title', 'format', 'size', 'storagePath', 'pageCount', 'progress', 'position', 'createdAt', 'updatedAt'])
+            && isText(d.title, 200)
+            && (!('author' in d) || d.author == null || (d.author is string && d.author.size() <= 200))
+            && d.format in ['pdf', 'epub', 'txt']
+            && d.size is int && d.size >= 0 && d.size <= 25 * 1024 * 1024
+            // The file must live in this user's own books folder.
+            && d.storagePath is string && d.storagePath.matches('^users/' + uid + '/books/[0-9a-f]{32}[.](pdf|epub|txt)$')
+            && d.pageCount is int && d.pageCount >= 0 && d.pageCount <= 100000
+            && d.progress is number && d.progress >= 0 && d.progress <= 1
+            && d.position is map && d.position.keys().hasOnly(['page', 'chapter', 'fraction'])
+            && (!('notebookId' in d) || d.notebookId == null || (d.notebookId is string && d.notebookId.size() <= 64))
+            && stampedNow(d);
+        }
+
+        allow read, delete: if isOwner(uid);
+        allow create: if isOwner(uid) && validBook(request.resource.data) && createdNow(request.resource.data);
+        allow update: if isOwner(uid) && validBook(request.resource.data) && createdUnchanged()
+          && request.resource.data.storagePath == resource.data.storagePath
+          && request.resource.data.format == resource.data.format;
+
+        match /highlights/{highlightId} {
+          allow read, delete: if isOwner(uid);
+          allow create: if isOwner(uid)
+            && request.resource.data.keys().hasOnly(['section', 'exact', 'prefix', 'suffix', 'createdAt'])
+            && request.resource.data.section is int && request.resource.data.section >= 0
+            && isText(request.resource.data.exact, 2000)
+            && request.resource.data.prefix is string && request.resource.data.prefix.size() <= 64
+            && request.resource.data.suffix is string && request.resource.data.suffix.size() <= 64
+            && createdNow(request.resource.data);
+        }
       }
     }
   }

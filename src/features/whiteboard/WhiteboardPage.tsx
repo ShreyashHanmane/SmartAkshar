@@ -17,7 +17,7 @@ import { NotesEditor } from '../notes/NotesEditor';
 import type { SaveStatus } from './saveState';
 import { DeleteNotebookDialog, RenameNotebookDialog } from '../notebooks/NotebookDialogs';
 import { SubjectsProvider, useSubject } from '../subjects/SubjectsProvider';
-import { BottomBar, TopBar } from './Bars';
+import { BottomBar, SavedChip, TopBar } from './Bars';
 import type { Element } from './model';
 import { infiniteToPages, pagesToInfinite } from './modes';
 import { defaultInk } from './paper';
@@ -75,14 +75,17 @@ function loadTools(): ToolState {
   };
 }
 
-function Editor({
+export function Editor({
   notebook,
   tab,
   onTab,
+  embedded = false,
 }: {
   notebook: Notebook;
   tab: 'whiteboard' | 'notes';
   onTab: (v: 'whiteboard' | 'notes') => void;
+  /** Inside another screen (the reader's notes pane): compact header, no notebook menu. */
+  embedded?: boolean;
 }) {
   const { uid } = useSignedInUser();
   const { settings } = useSettings();
@@ -108,7 +111,7 @@ function Editor({
     (status: SaveStatus, retry: () => void) => setNotesSave({ status, retry }),
     [],
   );
-  useStudyTracker(tab === 'whiteboard');
+  useStudyTracker(tab === 'whiteboard' && !embedded);
 
   const isSmall = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
   const dock: Dock = dockState.dock ?? (isSmall ? 'bottom' : settings.toolbarSide);
@@ -310,8 +313,14 @@ function Editor({
     );
 
   return (
-    <div ref={rootRef} className="flex h-dvh flex-col bg-canvas">
-      {!focus && (
+    <div ref={rootRef} className={`flex flex-col bg-canvas ${embedded ? 'h-full' : 'h-dvh'}`}>
+      {embedded && (
+        <div className="flex min-h-12 items-center justify-between gap-2 border-b border-line bg-surface px-3">
+          <h2 className="text-sm font-semibold text-ink">{t('reader.notesPane', { page: index + 1 })}</h2>
+          <SavedChip status={editor.status} onRetry={editor.retry} />
+        </div>
+      )}
+      {!focus && !embedded && (
         <TopBar
           title={notebook.title}
           subject={subject}

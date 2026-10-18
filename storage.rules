@@ -25,6 +25,19 @@ service firebase.storage {
         && request.resource.size <= (isGuest() ? 2 * 1024 * 1024 : 5 * 1024 * 1024);
     }
 
+    // Books: PDF / EPUB / TXT, 25 MB for accounts, 5 MB for guests. The app also
+    // checks file content (magic bytes) before uploading.
+    match /users/{uid}/books/{file} {
+      allow read, delete: if isOwner(uid);
+      allow create: if isOwner(uid)
+        && resource == null
+        && file.matches('^[0-9a-f]{32}[.](pdf|epub|txt)$')
+        && request.resource.contentType in ['application/pdf', 'application/epub+zip', 'text/plain']
+        && file.split('[.]')[1] == {'application/pdf': 'pdf', 'application/epub+zip': 'epub', 'text/plain': 'txt'}[request.resource.contentType]
+        && request.resource.size > 0
+        && request.resource.size <= (isGuest() ? 5 * 1024 * 1024 : 25 * 1024 * 1024);
+    }
+
     // Anything else under the user's folder: readable by the owner, not writable
     // until a module defines its upload rules.
     match /users/{uid}/{allPaths=**} {
