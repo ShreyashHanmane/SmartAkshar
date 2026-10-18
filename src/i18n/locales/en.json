@@ -1,0 +1,10 @@
+{
+  "app.name": "AKSHAR",
+  "app.tagline": "Smart Study Space",
+  "home.setupNotice": "The study space is being set up. Sign-in and your notebooks arrive in the next module.",
+  "error.title": "Something went wrong",
+  "error.body": "Please reload the page. Your saved work is safe.",
+  "error.reload": "Reload",
+  "notFound.title": "Page not found",
+  "notFound.home": "Go to the start page"
+}

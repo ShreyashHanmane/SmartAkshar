@@ -1,0 +1,174 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens. Values for the light theme are sampled from the approved
+ * screens in design/screens/. Components use the Tailwind utilities generated
+ * from @theme below (bg-surface, text-ink, border-line, ...), never raw colors.
+ * Tailwind's default palette is removed so off-token colors fail to compile.
+ */
+
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+  --canvas: #f5fbff;
+  --surface: #ffffff;
+  --surface-sunken: #e4eef7;
+  --line: #cfe3f5;
+  --line-strong: #9cc3e6;
+  --ink: #0f2a4a;
+  --ink-muted: #4a6582;
+  --primary: #1270c4;
+  --on-primary: #ffffff;
+  --primary-soft: #e2f1fd;
+  --accent: #1270c4;
+  --accent-on-soft: #1166b3;
+  --progress: #1270c4;
+  --track: #d6ebfc;
+  --highlight: #fde68a;
+  --danger: #c22a2a;
+  --on-danger: #ffffff;
+  --success: #15803d;
+  --focus: #1270c4;
+  --subject-physics: #1270c4;
+  --subject-math: #7a4bd0;
+  --subject-chemistry: #0f7f73;
+  --subject-history: #b44f12;
+  --subject-math-soft: #efe9f9;
+  --file-pdf: #c22a2a;
+  --file-epub: #7a4bd0;
+  --file-txt: #0f7f73;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --canvas: #0b1726;
+  --surface: #12233a;
+  --surface-sunken: #0e1c2f;
+  --line: #22405f;
+  --line-strong: #3a6590;
+  --ink: #e6f0fa;
+  --ink-muted: #a3b8ce;
+  --primary: #1a6fbd;
+  --on-primary: #ffffff;
+  --primary-soft: #16365a;
+  --accent: #7dbcf2;
+  --accent-on-soft: #7dbcf2;
+  --progress: #7dbcf2;
+  --track: #22405f;
+  --highlight: #6b5a14;
+  --danger: #c43535;
+  --on-danger: #ffffff;
+  --success: #4ade80;
+  --focus: #7dbcf2;
+  --subject-physics: #7dbcf2;
+  --subject-math: #b9a0ee;
+  --subject-chemistry: #5cc8bb;
+  --subject-history: #f29b63;
+  --subject-math-soft: #2a2347;
+  --file-pdf: #c43535;
+  --file-epub: #7a4bd0;
+  --file-txt: #0f7f73;
+}
+
+[data-theme='paper'] {
+  color-scheme: light;
+  --canvas: #f4ecdc;
+  --surface: #fbf6ec;
+  --surface-sunken: #ece1cb;
+  --line: #e0d2b6;
+  --line-strong: #c9b48d;
+  --ink: #2e2416;
+  --ink-muted: #65533b;
+  --primary: #1d5f9e;
+  --on-primary: #ffffff;
+  --primary-soft: #e6e6dc;
+  --accent: #1d5f9e;
+  --accent-on-soft: #1d5f9e;
+  --progress: #1d5f9e;
+  --track: #e6dac3;
+  --highlight: #f4d97c;
+  --danger: #a82424;
+  --on-danger: #ffffff;
+  --success: #166534;
+  --focus: #1d5f9e;
+  --subject-physics: #1d5f9e;
+  --subject-math: #6a3fb8;
+  --subject-chemistry: #0d6e63;
+  --subject-history: #9a420f;
+  --subject-math-soft: #ece3f2;
+  --file-pdf: #a82424;
+  --file-epub: #6a3fb8;
+  --file-txt: #0d6e63;
+}
+
+@theme {
+  --color-*: initial;
+  --font-*: initial;
+  --font-sans: 'Noto Sans', system-ui, sans-serif;
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-primary-soft: var(--primary-soft);
+  --color-accent: var(--accent);
+  --color-accent-on-soft: var(--accent-on-soft);
+  --color-progress: var(--progress);
+  --color-track: var(--track);
+  --color-highlight: var(--highlight);
+  --color-danger: var(--danger);
+  --color-on-danger: var(--on-danger);
+  --color-success: var(--success);
+  --color-focus: var(--focus);
+  --color-subject-physics: var(--subject-physics);
+  --color-subject-math: var(--subject-math);
+  --color-subject-chemistry: var(--subject-chemistry);
+  --color-subject-history: var(--subject-history);
+  --color-subject-math-soft: var(--subject-math-soft);
+  --color-file-pdf: var(--file-pdf);
+  --color-file-epub: var(--file-epub);
+  --color-file-txt: var(--file-txt);
+}
+
+/* Text size setting (Small / Medium / Large). Everything is sized in rem. */
+html {
+  font-size: 16px;
+}
+html[data-text-size='sm'] {
+  font-size: 15px;
+}
+html[data-text-size='lg'] {
+  font-size: 18px;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
