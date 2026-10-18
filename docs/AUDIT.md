@@ -36,23 +36,23 @@ Status: works / broken / UI-only / missing / disabled (Coming soon). "Module" re
 
 ## Whiteboard (`whiteboard-desktop-light.png`)
 
-| Element                                         | Expected behavior                                                   | Status  | Module | Target file                             |
-| ----------------------------------------------- | ------------------------------------------------------------------- | ------- | ------ | --------------------------------------- |
-| Back                                            | Return to previous screen                                           | missing | 4      | `src/features/whiteboard/TopBar.tsx`    |
-| Subject + title                                 | Show; rename via "..." menu                                         | missing | 4      | same                                    |
-| Saved chip                                      | Saving / Saved / Offline / Error                                    | missing | 4      | same                                    |
-| Paged / Infinite switch, AI sparkle, "..." menu | Per §5 (hidden under notification in capture)                       | missing | 4, 8   | same                                    |
-| Toolbar drag handle                             | Drag; dock left/right/bottom; collapse; remembered                  | missing | 4      | `src/features/whiteboard/Toolbar.tsx`   |
-| Lasso                                           | Circle-select; Move / Erase / Convert to text / Explain / Translate | missing | 4, 8   | same                                    |
-| Pen, Highlighter, Eraser, Shapes, Text          | Real tools; text font picker (sans / serif / handwriting)           | missing | 4      | same                                    |
-| 5 color swatches                                | Set stroke color                                                    | missing | 4      | same                                    |
-| Palette button                                  | Paper style + background, saved per notebook                        | missing | 4      | same                                    |
-| Undo / Redo                                     | History                                                             | missing | 4      | same                                    |
-| Size slider                                     | Pen thickness / highlighter opacity                                 | missing | 4      | same                                    |
-| Dotted paper                                    | Paper style; fixed logical coordinates, scaled to fit               | missing | 4      | `src/features/whiteboard/Canvas.tsx`    |
-| Prev / next page, Page X of Y                   | Navigate pages                                                      | missing | 4      | `src/features/whiteboard/BottomBar.tsx` |
-| Add page                                        | Append page                                                         | missing | 4      | same                                    |
-| Zoom −, %, +                                    | Zoom                                                                | missing | 4      | same                                    |
+| Element                                         | Expected behavior                                                   | Status                                                                         | Module | Target file                                    |
+| ----------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------ | ---------------------------------------------- |
+| Back                                            | Return to previous screen                                           | works                                                                          | 4      | `src/features/whiteboard/Bars.tsx`             |
+| Subject + title                                 | Show; rename via "..." menu                                         | works (rename via "..." menu)                                                  | 4      | `src/features/whiteboard/Bars.tsx`             |
+| Saved chip                                      | Saving / Saved / Offline / Error                                    | works (Saving / Saved / Offline / Error + Retry)                               | 4      | `src/features/whiteboard/Bars.tsx`             |
+| Paged / Infinite switch, AI sparkle, "..." menu | Per §5 (hidden under notification in capture)                       | works (switch keeps all content; AI and Export disabled until Modules 8 and 9) | 4, 8   | `src/features/whiteboard/WhiteboardPage.tsx`   |
+| Toolbar drag handle                             | Drag; dock left/right/bottom; collapse; remembered                  | works (drag or arrow keys; dock left/right/bottom; collapse; remembered)       | 4      | `src/features/whiteboard/Toolbar.tsx`          |
+| Lasso                                           | Circle-select; Move / Erase / Convert to text / Explain / Translate | works for select, Move, Erase; AI actions disabled until Module 8              | 4, 8   | `src/features/whiteboard/WhiteboardCanvas.tsx` |
+| Pen, Highlighter, Eraser, Shapes, Text          | Real tools; text font picker (sans / serif / handwriting)           | works                                                                          | 4      | `src/features/whiteboard/WhiteboardCanvas.tsx` |
+| 5 color swatches                                | Set stroke color                                                    | works                                                                          | 4      | `src/features/whiteboard/Toolbar.tsx`          |
+| Palette button                                  | Paper style + background, saved per notebook                        | works (paper style + background, saved per notebook)                           | 4      | `src/features/whiteboard/Toolbar.tsx`          |
+| Undo / Redo                                     | History                                                             | works (buttons and Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y)                             | 4      | `src/features/whiteboard/editorStore.ts`       |
+| Size slider                                     | Pen thickness / highlighter opacity                                 | works (pen width, highlighter opacity, text size)                              | 4      | `src/features/whiteboard/Toolbar.tsx`          |
+| Dotted paper                                    | Paper style; fixed logical coordinates, scaled to fit               | works                                                                          | 4      | `src/features/whiteboard/render.ts`            |
+| Prev / next page, Page X of Y                   | Navigate pages                                                      | works                                                                          | 4      | `src/features/whiteboard/Bars.tsx`             |
+| Add page                                        | Append page                                                         | works                                                                          | 4      | `src/features/whiteboard/Bars.tsx`             |
+| Zoom −, %, +                                    | Zoom                                                                | works (% resets to fit; pinch and Ctrl+wheel too)                              | 4      | `src/features/whiteboard/Bars.tsx`             |
 
 ## Flashcards (`flashcards-desktop-light.png`)
 
@@ -78,14 +78,14 @@ Status: works / broken / UI-only / missing / disabled (Coming soon). "Module" re
 
 ## Reader split view (`reader-split-desktop-light.png`)
 
-| Element             | Expected behavior                                          | Status  | Module  | Target file            |
-| ------------------- | ---------------------------------------------------------- | ------- | ------- | ---------------------- |
-| Back                | Return                                                     | missing | 6       | `src/features/reader/` |
-| Page X of Y         | Reading position, saved progress                           | missing | 6       | same                   |
-| Text selection menu | Highlight, Create flashcard, Explain, Summarize, Translate | missing | 6, 8    | same                   |
-| Highlights          | Saved and restored                                         | missing | 6       | same                   |
-| Divider             | Resize panes; tabs Book / Notes on mobile                  | missing | 6       | same                   |
-| Notes pane          | Handwritten/typed notes linked to the book                 | missing | 4, 5, 6 | same                   |
+| Element             | Expected behavior                                          | Status  | Module  | Target file                        |
+| ------------------- | ---------------------------------------------------------- | ------- | ------- | ---------------------------------- |
+| Back                | Return                                                     | works   | 6       | `src/features/whiteboard/Bars.tsx` |
+| Page X of Y         | Reading position, saved progress                           | missing | 6       | same                               |
+| Text selection menu | Highlight, Create flashcard, Explain, Summarize, Translate | missing | 6, 8    | same                               |
+| Highlights          | Saved and restored                                         | missing | 6       | same                               |
+| Divider             | Resize panes; tabs Book / Notes on mobile                  | missing | 6       | same                               |
+| Notes pane          | Handwritten/typed notes linked to the book                 | missing | 4, 5, 6 | same                               |
 
 ## Settings (`settings-desktop-light.png`)
 

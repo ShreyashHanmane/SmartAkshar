@@ -124,3 +124,37 @@
 
 - The whiteboard editor route (`/notebooks/:id`) shows a coming-soon page until Module 4 (next).
 - Typed-text fonts: serif and handwriting fonts are not yet self-hosted (decided in Module 4).
+
+## Module 4: Whiteboard (branch `feat/whiteboard`)
+
+**Status:** complete.
+
+**Done**
+
+- Full-screen editor (no tab bar). Top bar: back, subject and title, Saved chip (Saving / Saved / Offline / Error with Retry), Paged | Infinite switch, AI sparkle (disabled until Module 8), and a "..." menu with focus mode, Export PDF / image (disabled until Module 9), Rename, and Delete with confirmation.
+- Paged mode: fixed logical page, fit to the space left by the toolbar at any size. Infinite mode: unbounded canvas. Switching mode rewrites all pages in one atomic batch without dropping anything (pages are stacked on the infinite canvas, then split back by position). It warns if content extends past the page edges, and refuses if the combined content would exceed the document size limit.
+- Tools: lasso (select, drag to move, arrow keys, Delete, floating menu with Move / Erase / AI actions), pen (pressure width), highlighter, eraser (erases everything inside the drawn loop), shapes (rectangle, ellipse, line, arrow), and text (sans / serif / handwriting, edit by tapping). Five ink swatches; the size slider controls pen width, highlighter opacity, or text size. Undo and redo.
+- Toolbar: floating, draggable to dock left / right / bottom (also with arrow keys), collapsible, remembered. Defaults to the side from Settings, and to the bottom on mobile. Never covers the page.
+- Palette panel: paper style and background, saved per notebook. On dark paper the default ink switches to a light colour.
+- Bottom bar: previous / next page, add page, zoom out / % (fit) / in. Pinch, Ctrl+wheel, wheel pan, space or middle-drag pan. Keyboard shortcuts.
+- Palm rejection: once a stylus is used, single touches never draw; two fingers still pan and zoom.
+- Autosave (`EditorStore`, unit-tested): 700 ms debounce, per-page queue, retries rejected writes with 1/2/4/8 s backoff, then Error with manual Retry; local edits are never dropped. Last write wins per page, and pages with unsaved edits ignore remote snapshots. Edits made offline are queued by Firestore's persistent cache. A page refuses additions past 900 kB (Firestore's limit is 1 MiB) with a "page is full" message.
+- Performance: a base canvas layer is redrawn only when content changes, or incrementally after a stroke; a live layer holds the current gesture; during pan and zoom the bitmap moves with a CSS transform. With 1200 strokes, a full drawn stroke including saving takes about 400 ms and two zoom steps about 90 ms (e2e).
+- Study time is tracked while the whiteboard is open.
+
+**Decisions**
+
+- Fonts: @fontsource/noto-serif and @fontsource/caveat (user approved). They load only when used, and the canvas waits for them before drawing text.
+- No canvas library: plain Canvas 2D (no Konva or Fabric installed).
+- The menu supports disabled items with a "Coming soon" hint.
+
+**Bugs found and fixed along the way**
+
+- The selection menu could cover the selection: it now measures itself and sits above or below.
+- The palette panel was clipped behind the canvas when the toolbar was docked at the bottom (a transformed parent): it's now rendered outside the toolbar.
+
+**Test notes**
+
+- Google popup sign-in: Firebase loads Google's gapi script from apis.google.com even against the emulator, so this test depends on the live internet (about 4% flake measured). That single test may retry up to 2 times; its assertions are unchanged.
+- I removed my earlier attempt to pre-load that script on the login page, because it made every visitor load a Google script. It now loads only after someone clicks "Continue with Google".
+- The notebooks subject-filter e2e test failed once under full-suite load and then passed 30 of 30 in isolation. I'm watching it.
