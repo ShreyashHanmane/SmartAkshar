@@ -1,24 +1,18 @@
 import { useSignedInUser } from '../../app/session/SessionProvider';
-import { useSignOut } from '../auth/useSignOut';
 import { t } from '../../i18n/i18n';
-import { Button } from '../../ui/Button';
-import { Wordmark } from '../../ui/Wordmark';
+import { SearchBox } from '../search/SearchBox';
 
-/** Temporary signed-in start page; replaced by the app shell + dashboard in the next modules. */
+/** Temporary dashboard: greeting + global search. The full dashboard is built in Module 3. */
 export function HomePage() {
   const user = useSignedInUser();
-  const signOut = useSignOut();
   const name = user.isGuest ? t('home.guestName') : (user.displayName ?? user.email ?? '');
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-xl flex-col items-start justify-center gap-6 px-6">
-      <Wordmark />
-      <h1 className="text-2xl font-bold text-ink">{t('home.signedInAs', { name })}</h1>
-      <p className="text-base text-ink-muted">{t('home.nextModule')}</p>
-      <Button variant="secondary" icon="logOut" loading={signOut.busy} onClick={() => void signOut.start()}>
-        {t('auth.signOut')}
-      </Button>
-      {signOut.dialog}
-    </main>
+    <div className="flex flex-col gap-8">
+      <div className="max-w-xl">
+        <SearchBox />
+      </div>
+      <h1 className="text-3xl font-bold text-ink">{t('home.signedInAs', { name })}</h1>
+    </div>
   );
 }

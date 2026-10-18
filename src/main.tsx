@@ -7,10 +7,20 @@ import './index.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './app/App';
-import { applyAppearance, DEFAULT_APPEARANCE } from './theme/appearance';
+import { APPEARANCE_CACHE_KEY } from './app/settings/SettingsProvider';
+import { applyAppearance, parseAppearance } from './theme/appearance';
 
-// Per-user saved appearance is wired up in the Settings module.
-applyAppearance(document.documentElement, DEFAULT_APPEARANCE);
+function cachedAppearance(): unknown {
+  try {
+    const raw = localStorage.getItem(APPEARANCE_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+// First paint uses the last saved appearance; SettingsProvider then applies the account's settings.
+applyAppearance(document.documentElement, parseAppearance(cachedAppearance()));
 
 const container = document.getElementById('root');
 if (!container) throw new Error('Root element #root is missing from index.html');
