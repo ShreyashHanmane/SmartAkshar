@@ -49,6 +49,8 @@ import {
   verifyPassword,
 } from './auth.ts';
 import { type Db, tx } from './db.ts';
+import { addStarterContent } from './starter.ts';
+import { streamExport } from './export.ts';
 import type { EventHub } from './events.ts';
 import { HttpError, noContent, readJson, sendJson, streamToFile } from './http.ts';
 import { RateLimiter } from './security.ts';
@@ -67,6 +69,7 @@ export interface Ctx {
 type Handler = (ctx: Ctx) => Promise<void> | void;
 interface Route {
   method: string;
+  path: string;
   pattern: RegExp;
   handler: Handler;
 }
@@ -76,7 +79,12 @@ function route(method: string, path: string, handler: Handler) {
   const pattern = new RegExp(
     `^${path.replace(/:(\w+)/g, (_, name: string) => `(?<${name}>[A-Za-z0-9_-]{1,40})`)}$`,
   );
-  routes.push({ method, pattern, handler });
+  routes.push({ method, path, pattern, handler });
+}
+
+/** Every API route as "METHOD /path/:param" (used by the authorization tests). */
+export function routeTable(): { method: string; path: string }[] {
+  return routes.map(({ method, path }) => ({ method, path }));
 }
 
 export function match(method: string, path: string) {
@@ -99,10 +107,15 @@ const usedBytes = (db: Db, uid: string) =>
   );
 
 function userView(db: Db, uid: string) {
-  const row = db.prepare('SELECT id, username, display_name FROM users WHERE id = ?').get(uid) as
-    { id: string; username: string; display_name: string } | undefined;
+  const row = db.prepare('SELECT id, username, display_name, avatar FROM users WHERE id = ?').get(uid) as
+    { id: string; username: string; display_name: string; avatar: string | null } | undefined;
   if (!row) throw new HttpError(401, 'unauthenticated');
-  return { id: row.id, username: row.username, displayName: row.display_name };
+  return {
+    id: row.id,
+    username: row.username,
+    displayName: row.display_name,
+    avatarUrl: row.avatar ? `/api/files/images/${row.avatar}` : null,
+  };
 }
 
 // --- accounts ----------------------------------------------------------------
@@ -118,11 +131,14 @@ route('POST', '/api/auth/signup', async (ctx) => {
   if (exists) throw new HttpError(409, 'username-taken');
   const id = newId();
   const hash = await hashPassword(body.password);
-  ctx.db
-    .prepare(
-      'INSERT INTO users (id, username, display_name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)',
-    )
-    .run(id, body.username, body.name, hash, now());
+  tx(ctx.db, () => {
+    ctx.db
+      .prepare(
+        'INSERT INTO users (id, username, display_name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)',
+      )
+      .run(id, body.username, body.name, hash, now());
+    if (body.starter !== false) addStarterContent(ctx.db, id, now());
+  });
   createSession(ctx.db, id, ctx.res, ctx.secure);
   sendJson(ctx.res, 201, { user: userView(ctx.db, id) });
 });
@@ -181,6 +197,8 @@ route('PATCH', '/api/account', async (ctx) => {
 route('POST', '/api/account/delete', async (ctx) => {
   const uid = requireUser(ctx.db, ctx.req);
   const body = await readJson(ctx.req, z.object({ password: z.string().max(128) }).strict());
+  // Same budget as password changes: a stolen session can't guess its way to deletion.
+  if (!loginLimiter.take(`password|${uid}`)) throw new HttpError(429, 'rate-limited');
   const row = ctx.db.prepare('SELECT password_hash FROM users WHERE id = ?').get(uid) as {
     password_hash: string;
   };
@@ -191,6 +209,73 @@ route('POST', '/api/account/delete', async (ctx) => {
   ctx.hub.closeAll(uid);
   endSession(ctx.db, ctx.req, ctx.res, ctx.secure);
   noContent(ctx.res);
+});
+
+/** Profile photo marker in files.owner_ref ('@' can't appear in notebook ids). */
+const AVATAR_REF = '@avatar';
+const AVATAR_MAX_BYTES = 1024 * 1024;
+
+async function removeAvatarFiles(ctx: Ctx, uid: string, keep?: string) {
+  const rows = ctx.db
+    .prepare("SELECT name FROM files WHERE user_id = ? AND kind = 'image' AND owner_ref = ?")
+    .all(uid, AVATAR_REF) as { name: string }[];
+  for (const { name } of rows) {
+    if (name === keep) continue;
+    await rm(join(userDir(ctx, uid, 'images'), name), { force: true });
+    ctx.db.prepare('DELETE FROM files WHERE user_id = ? AND name = ?').run(uid, name);
+  }
+}
+
+/** Sets the profile photo (PNG/JPEG/WebP, up to 1 MB; the app sends a small square). */
+route('POST', '/api/account/avatar', async (ctx) => {
+  const uid = requireUser(ctx.db, ctx.req);
+  const ext = fileName(ctx).toLowerCase().split('.').pop() ?? '';
+  const { tmp, size, head } = await receiveFile(ctx, uid, 'images', AVATAR_MAX_BYTES);
+  const kind = sniffImage(head);
+  if (!kind || kind === 'gif' || ![IMAGE_EXT[kind], kind].includes(ext) || size === 0) {
+    await rm(tmp, { force: true });
+    throw new HttpError(415, 'type');
+  }
+  const name = `${randomBytes(16).toString('hex')}.${IMAGE_EXT[kind]}`;
+  await rename(tmp, join(userDir(ctx, uid, 'images'), name));
+  tx(ctx.db, () => {
+    ctx.db
+      .prepare(
+        "INSERT INTO files (user_id, name, kind, size, owner_ref, created_at) VALUES (?, ?, 'image', ?, ?, ?)",
+      )
+      .run(uid, name, size, AVATAR_REF, now());
+    ctx.db.prepare('UPDATE users SET avatar = ? WHERE id = ?').run(name, uid);
+  });
+  await removeAvatarFiles(ctx, uid, name);
+  ctx.hub.publish(uid, 'account');
+  sendJson(ctx.res, 200, { user: userView(ctx.db, uid) });
+});
+
+route('DELETE', '/api/account/avatar', async (ctx) => {
+  const uid = requireUser(ctx.db, ctx.req);
+  ctx.db.prepare('UPDATE users SET avatar = NULL WHERE id = ?').run(uid);
+  await removeAvatarFiles(ctx, uid);
+  ctx.hub.publish(uid, 'account');
+  sendJson(ctx.res, 200, { user: userView(ctx.db, uid) });
+});
+
+/** Real storage numbers for Settings → Data. */
+route('GET', '/api/account/storage', (ctx) => {
+  const uid = requireUser(ctx.db, ctx.req);
+  const by = (kind: string) =>
+    ctx.db
+      .prepare(
+        'SELECT COUNT(*) AS count, COALESCE(SUM(size), 0) AS bytes FROM files WHERE user_id = ? AND kind = ?',
+      )
+      .get(uid, kind) as { count: number; bytes: number };
+  const books = by('book');
+  const images = by('image');
+  sendJson(ctx.res, 200, {
+    used: Number(books.bytes) + Number(images.bytes),
+    limit: USER_FILES_MAX_BYTES,
+    books: { count: Number(books.count), bytes: Number(books.bytes) },
+    images: { count: Number(images.count), bytes: Number(images.bytes) },
+  });
 });
 
 // --- settings ----------------------------------------------------------------
@@ -984,4 +1069,12 @@ route('DELETE', '/api/books/:id/highlights/:hid', (ctx) => {
  */
 route('GET', '/api/events', (ctx) => {
   ctx.hub.add(sessionUser(ctx.db, ctx.req) ?? '', ctx.res);
+});
+
+// --- export ------------------------------------------------------------------
+
+/** Everything the user created, as one ZIP (data.json + their files). */
+route('GET', '/api/export', async (ctx) => {
+  const uid = requireUser(ctx.db, ctx.req);
+  await streamExport(ctx.db, ctx.dataDir, uid, ctx.res);
 });

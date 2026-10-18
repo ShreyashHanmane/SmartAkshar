@@ -55,6 +55,8 @@ interface Props {
   onChange: (elements: Element[]) => 'ok' | 'too-large';
   onPageFull: () => void;
   label: string;
+  /** AI on the lasso selection (only the selected elements are passed on). */
+  onAiSelection: (elements: Element[], action: 'handwriting' | 'explain' | 'translate') => void;
 }
 
 type Gesture =
@@ -90,8 +92,20 @@ function pressureOf(e: PointerEvent): number {
  * zoom the base bitmap is moved with a CSS transform and redrawn once at rest.
  */
 export function WhiteboardCanvas(props: Props) {
-  const { elements, mode, paper, background, tool, view, onViewChange, insets, onChange, onPageFull, label } =
-    props;
+  const {
+    elements,
+    mode,
+    paper,
+    background,
+    tool,
+    view,
+    onViewChange,
+    insets,
+    onChange,
+    onPageFull,
+    label,
+    onAiSelection,
+  } = props;
   const boxRef = useRef<HTMLDivElement>(null);
   const baseRef = useRef<HTMLCanvasElement>(null);
   const liveRef = useRef<HTMLCanvasElement>(null);
@@ -697,6 +711,12 @@ export function WhiteboardCanvas(props: Props) {
             setSelection(new Set());
           }}
           onDone={() => setSelection(new Set())}
+          onAi={(action) =>
+            onAiSelection(
+              elements.filter((el) => liveSelection.has(el.id)),
+              action,
+            )
+          }
         />
       )}
     </div>

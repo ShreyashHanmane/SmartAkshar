@@ -2,11 +2,19 @@ import { useId, type ReactNode } from 'react';
 import { useSettings } from '../../app/settings/SettingsProvider';
 import { PageHeader } from '../../app/shell/PageHeader';
 import { t } from '../../i18n/i18n';
-import { Button } from '../../ui/Button';
 import { Segmented } from '../../ui/Segmented';
-import { useSignOut } from '../auth/useSignOut';
+import { AccountCard } from './AccountCard';
+import { DataCard } from './DataCard';
 
-function Row({ title, description, control }: { title: string; description?: string; control: ReactNode }) {
+export function Row({
+  title,
+  description,
+  control,
+}: {
+  title: string;
+  description?: string;
+  control: ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-3 border-t border-line py-4 first:border-t-0 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
@@ -29,7 +37,6 @@ export function Card({ title, children }: { title: string; children: ReactNode }
 
 export function SettingsPage() {
   const { settings, update } = useSettings();
-  const signOut = useSignOut();
   const languageId = useId();
 
   return (
@@ -104,22 +111,8 @@ export function SettingsPage() {
         />
       </Card>
 
-      <Card title={t('settings.account')}>
-        <Row
-          title={t('auth.signOut')}
-          control={
-            <Button
-              variant="secondary"
-              icon="logOut"
-              loading={signOut.busy}
-              onClick={() => void signOut.start()}
-            >
-              {t('auth.signOut')}
-            </Button>
-          }
-        />
-      </Card>
-      {signOut.dialog}
+      <AccountCard />
+      <DataCard />
     </div>
   );
 }

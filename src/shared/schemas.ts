@@ -33,12 +33,20 @@ export const signUpSchema = z.object({
   name: displayNameSchema,
   username: usernameSchema,
   password: passwordSchema,
+  /** Starter subjects, decks, and cards for new accounts (default on; tests turn it off). */
+  starter: z.boolean().optional(),
 });
 export const loginSchema = z.object({
   username: z.string().trim().min(1, 'auth.validation.usernameRequired').max(32),
   password: z.string().min(1, 'auth.validation.passwordRequired').max(128),
 });
-export const userSchema = z.object({ id: idSchema, username: z.string(), displayName: z.string() });
+export const userSchema = z.object({
+  id: idSchema,
+  username: z.string(),
+  displayName: z.string(),
+  /** Profile photo URL (the user's own uploaded image), or null. */
+  avatarUrl: z.string().nullable().catch(null),
+});
 export type User = z.infer<typeof userSchema>;
 
 // --- settings --------------------------------------------------------------
@@ -235,3 +243,51 @@ export const statsSchema = z.object({
   boxes: z.array(z.number().int()).length(5),
 });
 export type FlashcardStats = z.infer<typeof statsSchema>;
+
+// --- AI --------------------------------------------------------------------
+export const AI_ACTIONS = ['summarize', 'explain', 'translate', 'flashcards', 'handwriting'] as const;
+export type AiAction = (typeof AI_ACTIONS)[number];
+export const AI_LANGUAGES = [
+  'English',
+  'Hindi',
+  'Spanish',
+  'French',
+  'German',
+  'Tamil',
+  'Bengali',
+  'Marathi',
+  'Telugu',
+  'Arabic',
+  'Chinese',
+  'Japanese',
+] as const;
+/** Limits on what is sent to the AI provider. */
+export const AI_MAX_TEXT = 12_000;
+/** Base64 PNG of selected handwriting, about 1.5 MB. */
+export const AI_MAX_IMAGE_CHARS = 2_000_000;
+export const AI_DAILY_LIMIT = 20;
+export const aiRequestSchema = z
+  .object({
+    action: z.enum(AI_ACTIONS),
+    text: z.string().trim().min(1).max(AI_MAX_TEXT).optional(),
+    image: z
+      .string()
+      .max(AI_MAX_IMAGE_CHARS)
+      .regex(/^data:image\/png;base64,[A-Za-z0-9+/]+=*$/)
+      .optional(),
+    targetLanguage: z.enum(AI_LANGUAGES).optional(),
+  })
+  .strict()
+  .refine((r) => (r.action === 'handwriting' ? !!r.image : !!r.text || !!r.image), {
+    message: 'input-required',
+  })
+  .refine((r) => r.action !== 'flashcards' || !!r.text, { message: 'text-required' });
+export type AiRequest = z.infer<typeof aiRequestSchema>;
+export const aiCardSchema = z.object({
+  front: z.string().trim().min(1).max(CARD_TEXT_MAX),
+  back: z.string().trim().min(1).max(CARD_TEXT_MAX),
+});
+export const aiResponseSchema = z.object({ text: z.string(), cards: z.array(aiCardSchema).optional() });
+export type AiResponse = z.infer<typeof aiResponseSchema>;
+export const aiStatusSchema = z.object({ enabled: z.boolean(), limit: z.number(), used: z.number() });
+export type AiStatus = z.infer<typeof aiStatusSchema>;

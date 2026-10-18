@@ -32,6 +32,13 @@ interface Props {
   onSelection: (s: SelectionEvent | null) => void;
   onHighlightClick: (id: string, rect: SelectionEvent['rect']) => void;
   onScrollFraction: (f: number) => void;
+  /** Gives the reader access to text for AI (current section, or the whole book up to a limit). */
+  onTextApi?: (api: BookTextApi) => void;
+}
+
+export interface BookTextApi {
+  sectionText: () => string;
+  bookText: (limit: number) => Promise<string>;
 }
 
 export async function inspectBook(
@@ -68,6 +75,32 @@ export async function inspectBook(
   return { format, sections, count: sections.length, title: null, author: null };
 }
 
+/** Text of the whole book, in order, up to `limit` characters (for "Summarize whole book"). */
+async function wholeText(loaded: Loaded, limit: number): Promise<string> {
+  const parts: string[] = [];
+  let size = 0;
+  const add = (text: string) => {
+    const clean = text.replace(/\s+/g, ' ').trim();
+    if (!clean) return;
+    parts.push(clean);
+    size += clean.length + 2;
+  };
+  if (loaded.format === 'txt')
+    for (const section of loaded.sections) for (const p of section) if (size < limit) add(p);
+  if (loaded.format === 'pdf')
+    for (let i = 1; i <= loaded.pdf.numPages && size < limit; i++) {
+      const content = await (await loaded.pdf.getPage(i)).getTextContent();
+      add(content.items.map((it) => ('str' in it ? it.str : '')).join(' '));
+    }
+  if (loaded.format === 'epub')
+    for (const chapter of loaded.epub.chapters) {
+      if (size >= limit) break;
+      const html = await loaded.epub.zip.text(chapter.path);
+      add(new DOMParser().parseFromString(html, 'text/html').body.textContent ?? '');
+    }
+  return parts.join('\n\n').slice(0, limit);
+}
+
 /** Reading stylesheet for EPUB chapters (theme colours passed in as values). */
 function epubDocument(
   html: string,
@@ -100,6 +133,7 @@ export function BookView(props: Props) {
     onSelection,
     onHighlightClick,
     onScrollFraction,
+    onTextApi,
   } = props;
   const boxRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -108,9 +142,16 @@ export function BookView(props: Props) {
   const [width, setWidth] = useState(0);
   const textRoot = useRef<HTMLElement | null>(null);
   const highlightsRef = useRef(highlights);
-  const callbacks = useRef({ onLoaded, onFailed, onSelection, onHighlightClick, onScrollFraction });
+  const callbacks = useRef({
+    onLoaded,
+    onFailed,
+    onSelection,
+    onHighlightClick,
+    onScrollFraction,
+    onTextApi,
+  });
   useLayoutEffect(() => {
-    callbacks.current = { onLoaded, onFailed, onSelection, onHighlightClick, onScrollFraction };
+    callbacks.current = { onLoaded, onFailed, onSelection, onHighlightClick, onScrollFraction, onTextApi };
   });
 
   useLayoutEffect(() => {
@@ -133,6 +174,10 @@ export function BookView(props: Props) {
         if (result.format === 'pdf') destroy = result.destroy;
         setLoaded(result);
         callbacks.current.onLoaded({ count: result.count, title: result.title, author: result.author });
+        callbacks.current.onTextApi?.({
+          sectionText: () => (textRoot.current?.textContent ?? '').replace(/\s+/g, ' ').trim(),
+          bookText: (limit) => wholeText(result, limit),
+        });
       })
       .catch(() => {
         if (!cancelled) callbacks.current.onFailed();

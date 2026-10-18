@@ -245,3 +245,114 @@
 - **Stale refetch race (found by a flaky notes test):** a live-update refetch that started before a save could arrive after it and briefly show older content. Saves now return the server's `updatedAt`; the whiteboard store and the notes editor ignore copies older than their latest confirmed save (unit-tested).
 
 **Tests:** 7 new e2e scenarios (deck and cards with due counts and badge; review by click, swipe and keyboard with schedule saved; quiz; edit and delete; Create and Progress tabs; flashcard from a PDF selection; dashboard Review now), 5 server tests and 7 scheduler unit tests. Full e2e suite: 172 passed, twice in a row.
+
+## Module 8: AI (branch `feat/ai`)
+
+**Status:** complete. Gemini through the local server; off until `GEMINI_API_KEY` is set in `.env.local`.
+
+**Done**
+
+- **Server** (`server/ai/`):
+  - `POST /api/ai/run` and `GET /api/ai/status`, with the provider behind the `AiProvider` interface (Gemini by default).
+  - Limits: session required; 5 requests per minute; 20 per day (counted in the new `ai_usage` table and refunded on provider errors); text capped at 12,000 characters; handwriting images capped; 30-second timeout; output capped.
+  - Prompt-injection defense: fixed system instructions, with student material fenced and treated as data.
+  - Logs are metadata only, with a hashed user id.
+- **AI panel:** a side panel on desktop and tablet, a bottom sheet on mobile.
+  - Actions: summarize, explain, translate (with a language picker), make flashcards, convert handwriting to text.
+  - States what is sent and shows daily usage; spinner with Cancel; friendly errors (off, quota, too long, timeout, unreachable).
+  - Results render as plain text. Result actions: Copy, Insert into notes, Save as flashcard, and choose a deck for generated cards.
+- **Entry points:**
+  - Dashboard "Ask AI".
+  - Whiteboard sparkle (whole page) and lasso menu (Convert to text, Explain, Translate on the selection only).
+  - Reader: selection menu (Explain, Summarize, Translate), "Make flashcards with AI" from a highlight, and the header "Summarize with AI" (this page or the whole book).
+- **Starter content** (user request): every new account gets 4 subjects and 4 decks with 13 sample cards, created with the account and fully editable. CLAUDE.md §4 now records this exception.
+
+**Bugs found and fixed**
+
+- Notes editor re-applied Tiptap options on every render (new `extensions`/`editorProps` objects); they're now stable.
+- Flaky mobile link test: ProseMirror hadn't yet read the browser's Shift+Home selection when the toolbar was tapped about 50 ms later. Instrumentation showed no remount or remote overwrite. The test now selects with Ctrl/Cmd+A, which the editor handles synchronously. It passed 180 times in a row.
+
+**Tests:** 7 server AI tests (fake provider: auth, quota and refund, size limits, fenced prompts, card parsing, timeouts), prompt unit tests, a starter-content API test, and new e2e scenarios in `tests/e2e/ai.spec.ts` against a second test-only server with a scripted AI (no network). Full e2e suite: 192 passed, 3 skipped by design (mobile duplicates of selection flows).
+
+**Remember:** set a budget alert in Google AI Studio / Cloud for the Gemini key.
+
+## Module 9: Export (branch `feat/export`)
+
+**Status:** complete. No new dependencies: the PDF, DOCX and ZIP writers are hand-written (`src/features/export/`, `src/shared/zip.ts`).
+
+**Done**
+
+- **Whiteboard:** "..." → Export PDF lets you choose this page or all pages, with a progress bar and Cancel. Paged notebooks export as A4 pages. Infinite mode exports the drawing's bounds. "Export image" saves a PNG of the current page at 2000 × 2828.
+- **Notes:** Export PDF (A4, laid out with the app's fonts, so every script renders) and Export Word (DOCX: headings, marks, links, nested lists, quotes, code, dividers, images). Both use the editor's current content, so text typed just before exporting is included.
+- **Flashcards:** deck menu → Export CSV (front, back, deck, box, due). Formula injection is neutralized, and there's a BOM so Excel reads UTF-8.
+- **Full data export:** Settings → Data → Export ZIP. The server streams a ZIP of `data.json` (all of the user's data; never password hashes or sessions), their books and note images, and a README. Progress shows MB downloaded, with Cancel.
+- File names are sanitized; ZIP entry names can't escape the archive.
+
+**Decisions**
+
+- PDFs are made of lossless page images (Flate RGB) rather than vector text. The output looks exactly like the app in every script, without embedding fonts. The trade-off is that PDF text isn't selectable or searchable; DOCX is the editable format.
+- The Settings "Data" card was started here for the ZIP export; the rest of Settings is Module 10.
+
+**Verification beyond the tests:** sample PDFs pass `qpdf --check`; LibreOffice opened the DOCX and converted it to PDF, which rendered correctly; Python's `zipfile` read the ZIPs with no errors.
+
+**Tests:** unit tests for ZIP (CRC, round trip, path safety), PDF (opened with pdf.js: page count, sizes, title), DOCX (package parts, numbering, links, image scaling), notes layout (wrapping, margins, pagination) and CSV (injection, quoting). Server tests for the export cover contents, no secrets, owner-only and session required. E2E (`tests/e2e/export.spec.ts`) downloads each file and opens it: PDF page count and size, PNG pixels, DOCX text, CSV text, ZIP `data.json`. Full e2e suite: 204 passed, 3 skipped by design.
+
+## Module 10: Settings and profile (branch `feat/settings`)
+
+**Status:** complete.
+
+**Done**
+
+- **Appearance** (from Module 2, unchanged): theme, text size, language, whiteboard toolbar side.
+- **Account**, matching the design's Account card:
+  - **Photo:** Change photo / Remove photo. The browser crops the picked image to a 256 px square JPEG, which drops EXIF and GPS data. The server accepts only PNG/JPEG/WebP up to 1 MB, checked by content, and replacing a photo deletes the old file.
+  - **Name:** saved on Enter or when you leave the field.
+  - **Username:** read-only. It stands in for the design's Email field, because local accounts have no email.
+  - **Change password:** current, new and confirm; other sessions are signed out.
+  - **Sign out:** asks first if changes are still waiting to save.
+- **Data:**
+  - **Export ZIP** (Module 9).
+  - **Storage used:** real bytes against the 200 MB limit, with counts and sizes for books and images.
+  - **Sync status:** whether the server is reachable, plus unsaved changes added up from every notes and whiteboard saver (`src/app/save/pending.ts`).
+- **Danger zone:** Delete account. It needs your password, and wrong guesses are rate-limited (10 per 15 minutes, like password changes). It deletes all rows and files, then returns to the login screen.
+- The name and photo stay current across tabs (the `account` live topic).
+
+**Bug found and fixed:** pressing Enter in the Name field did nothing. A form with two text fields and no submit button isn't submitted by the browser, so the field now handles Enter itself. Covered by an e2e test.
+
+**Tests:** 4 server tests (photo set, replace and remove, owner-only access, disguised, oversize and GIF rejected; storage numbers; delete rate limit), a sync-summary unit test, and 4 e2e scenarios on desktop, tablet and mobile. I reviewed screenshots of Settings in light, dark and paper themes at all three sizes.
+
+**Not covered by an automated test:** the sign-out "unsaved changes" warning. It only appears while a save is in flight or failing, which can't be reproduced reliably in e2e; the logic is a single check of the tested sync summary.
+
+## Module 11: Offline and PWA (branch `feat/pwa`)
+
+**Status:** complete.
+
+**Done**
+
+- **Installable:** web manifest, 192 and 512 px icons plus a maskable icon, an apple-touch icon, a favicon and the theme colour. Settings → Data has "Install the app": an Install button when the browser offers it, "Installed" when running as an app, and a pointer to the browser menu otherwise.
+- **Service worker** (no dependency; generated at build): precaches the app shell and code. Fonts and pdf.js data are cached when first used. It never caches `/api/`. Old caches are removed when a new build activates.
+- **Server unreachable:** the app still opens from the cache and shows "Can't reach the AKSHAR server" with Reload, then recovers when the server is back.
+- **Sync status and retry:** whiteboard and notes edits made while the server is unreachable stay queued and retry with backoff (existing e2e test). Settings shows the live sync status (Module 10).
+
+**Open item for you:** the repo has no exported logo file. The app icons are cut from the original logo in the design screenshots (about 41 px source), so they're slightly soft at 512 px. Nothing was redrawn. Please export the logo mark from Figma (SVG or a large PNG) into `public/icons/`, and I'll regenerate the sizes and add the mark to the in-app wordmark.
+
+**Tests:** `tests/e2e/pwa.spec.ts` covers the manifest and icon sizes; the service worker taking control; no `/api` entry in any cache; the app opening offline and recovering; and caches after sign-out. Full suite: 225 passed, 3 skipped by design.
+
+## Module 12: Security and quality pass (branch `feat/hardening`) — in progress
+
+**Done so far**
+
+- `tests/server/security.test.ts` walks the server's real route table, so routes added later are covered too:
+  - Every non-public route returns 401 without a session.
+  - Every write is rejected without the CSRF header or from a foreign origin.
+  - Another user calling every route with Alice's ids gets none of her data, and her full export is byte-for-byte unchanged afterwards. A deliberately injected leak was caught.
+  - Security headers are present on API responses and errors.
+- **Fixed:** the server could be bound to the network through the `HOST` variable. It now refuses any address that isn't loopback.
+- `tests/e2e/quality.spec.ts`:
+  - No console errors or uncaught exceptions on any main screen.
+  - The page itself is served with the security headers.
+  - A no-dependency accessibility check: controls have names, inputs have labels, images have alt text, touch targets are at least 44 px. **Fixed:** the dashboard's "Open library" link was 24 px tall.
+- Git history scanned for secrets: clean. The only committed env file holds placeholders.
+- `npm audit`: 0 vulnerabilities.
+
+**Left:** Lighthouse is not installed and would need a new package, so it hasn't been run; ask before adding it. Also left: a final review of upload limits and of the error boundary, then the module report.

@@ -305,3 +305,27 @@ describe('live updates', () => {
     ctrl.abort();
   });
 });
+
+describe('starter content', () => {
+  it('gives new accounts editable starter subjects, decks, and due cards', async () => {
+    const c = new Client(server.base);
+    await c.signUp(`starter${Date.now()}`, 'study1234', 'S', true);
+    const subjects = (await (await c.json('GET', '/api/subjects')).json()) as { name: string }[];
+    expect(subjects.map((s) => s.name)).toEqual(['Physics', 'Mathematics', 'Chemistry', 'History']);
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+    const decks = (await (await c.json('GET', `/api/decks?before=${end.getTime()}`)).json()) as {
+      title: string;
+      total: number;
+      due: number;
+    }[];
+    expect(decks.map((d) => [d.title, d.total, d.due])).toEqual([
+      ['Mechanics essentials', 4, 4],
+      ['Derivatives & integrals', 3, 3],
+      ['Functional groups', 3, 3],
+      ['Freedom movement', 3, 3],
+    ]);
+    const physics = decks[0] as unknown as { id: string };
+    expect((await c.json('DELETE', `/api/decks/${physics.id}`)).status).toBe(204);
+  });
+});

@@ -27,7 +27,7 @@ test('a new account sees real, empty stats and helpful empty states', async ({ p
   await expect(page.getByText('0%')).toBeVisible();
   await expect(page.getByText('No notebooks yet. Create your first one.')).toBeVisible();
   await expect(page.getByText('No books yet.', { exact: false })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Ask AI' })).toHaveAttribute('aria-disabled', 'true');
+  await expect(page.getByRole('button', { name: 'Ask AI' })).toBeEnabled();
 });
 
 test('create, rename, and delete a notebook', async ({ page }) => {

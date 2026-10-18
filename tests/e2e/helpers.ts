@@ -37,7 +37,8 @@ export async function signUpFresh(page: Page, name = 'Asha'): Promise<string> {
   const username = uniqueName('u');
   const res = await page.request.post('/api/auth/signup', {
     headers: { 'X-Akshar': '1' },
-    data: { name, username, password: PASSWORD },
+    // Tests start from an empty account; starter content has its own tests.
+    data: { name, username, password: PASSWORD, starter: false },
   });
   expect(res.status()).toBe(201);
   await page.goto('/');

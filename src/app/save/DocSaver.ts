@@ -1,3 +1,4 @@
+import { reportSaves } from './pending';
 import { retryDelay } from '../../features/whiteboard/saveState';
 
 export interface DocSaverDeps<T> {
@@ -44,6 +45,10 @@ export class DocSaver<T> {
 
   private set(patch: Partial<DocSaverState>) {
     this.state = { ...this.state, ...patch };
+    reportSaves(this, {
+      pending: (this.state.dirty ? 1 : 0) + this.state.inFlight,
+      failed: this.state.failed,
+    });
     for (const l of this.listeners) l();
   }
 

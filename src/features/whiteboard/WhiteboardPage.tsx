@@ -14,6 +14,12 @@ import { FullPageLoader } from '../../ui/FullPageLoader';
 import { Icon } from '../../ui/Icon';
 import { useToast } from '../../ui/Toast';
 import { NotesEditor } from '../notes/NotesEditor';
+import { AiPanel, type AiSource } from '../ai/AiPanel';
+import { ExportDialog, useQuickExport } from '../export/ExportDialog';
+import { notesDocx, notesPdf, safeFileName, whiteboardPdf, whiteboardPng } from '../export/exporters';
+import type { JsonNode } from '../../shared/clean';
+import type { AiAction } from '../../shared/schemas';
+import { elementsToPng } from './snapshot';
 import type { SaveStatus } from './saveState';
 import { DeleteNotebookDialog, RenameNotebookDialog } from '../notebooks/NotebookDialogs';
 import { SubjectsProvider, useSubject } from '../subjects/SubjectsProvider';
@@ -100,9 +106,12 @@ export function Editor({
   const [pageIndex, setPageIndex] = useState(0);
   const [view, setView] = useState<ViewState>(FIT);
   const [focus, setFocus] = useState(false);
-  const [dialog, setDialog] = useState<'rename' | 'delete' | null>(null);
+  const [dialog, setDialog] = useState<'rename' | 'delete' | 'pdf' | 'notesPdf' | null>(null);
+  const notesContent = useRef<(() => JsonNode | null) | null>(null);
+  const quickExport = useQuickExport();
   const [confirmPaged, setConfirmPaged] = useState<{ pages: Element[][]; outside: number } | null>(null);
   const [switching, setSwitching] = useState(false);
+  const [ai, setAi] = useState<{ source: AiSource; autoRun?: AiAction } | null>(null);
   const [notesSave, setNotesSave] = useState<{ status: SaveStatus; retry: () => void }>({
     status: 'saved',
     retry: () => undefined,
@@ -249,38 +258,92 @@ export function Editor({
 
   const menu = [
     { label: t('whiteboard.focus'), icon: 'focus' as const, onSelect: enterFocus },
-    {
-      label: t('whiteboard.exportPdf'),
-      icon: 'download' as const,
-      disabled: true,
-      hint: t('common.comingSoon'),
-      onSelect: () => undefined,
-    },
+    { label: t('whiteboard.exportPdf'), icon: 'download' as const, onSelect: () => setDialog('pdf') },
     {
       label: t('whiteboard.exportImage'),
       icon: 'download' as const,
-      disabled: true,
-      hint: t('common.comingSoon'),
-      onSelect: () => undefined,
+      onSelect: () =>
+        void quickExport(async () => ({
+          blob: await whiteboardPng(page?.elements ?? [], notebook),
+          name: safeFileName(
+            mode === 'paged' && pages.length > 1 ? `${notebook.title} p${index + 1}` : notebook.title,
+            'png',
+          ),
+        })),
     },
     { label: t('notebooks.rename'), icon: 'pencil' as const, onSelect: () => setDialog('rename') },
     { label: t('common.delete'), icon: 'trash' as const, danger: true, onSelect: () => setDialog('delete') },
   ];
 
+  /** The notes as shown in the editor (including edits not yet saved). */
+  function currentNotes(): JsonNode {
+    const doc = notesContent.current?.();
+    if (!doc) throw new Error('Notes are still loading');
+    return doc;
+  }
+
+  const exportDialogs = (
+    <>
+      {dialog === 'pdf' && (
+        <ExportDialog
+          title={t('whiteboard.exportPdf')}
+          {...(mode === 'paged' && pages.length > 1
+            ? {
+                choices: {
+                  label: t('export.pages'),
+                  options: [
+                    { value: 'page' as const, label: t('export.thisPage', { n: index + 1 }) },
+                    { value: 'all' as const, label: t('export.allPages', { count: pages.length }) },
+                  ],
+                },
+              }
+            : {})}
+          run={async (choice, progress) => {
+            const selected = choice === 'all' ? pages : page ? [page] : [];
+            const blob = await whiteboardPdf(
+              selected.length ? selected.map((p) => p.elements) : [[]],
+              notebook,
+              progress,
+            );
+            return { blob, name: safeFileName(notebook.title, 'pdf') };
+          }}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog === 'notesPdf' && (
+        <ExportDialog
+          title={t('notes.exportPdf')}
+          description={t('export.notesPdfHint')}
+          run={async (_choice, progress) => ({
+            blob: await notesPdf(currentNotes(), notebook.title, progress),
+            name: safeFileName(`${notebook.title} notes`, 'pdf'),
+          })}
+          onClose={() => setDialog(null)}
+        />
+      )}
+    </>
+  );
+
+  // AI: an image of only the strokes asked about (the whole page from the sparkle, or the lasso selection).
+  function openAi(elements: Element[], label: string, autoRun?: AiAction) {
+    const png = elementsToPng(elements);
+    if (!png) {
+      toast.info(t('ai.nothingToSend'));
+      return;
+    }
+    setAi({ source: { kind: 'image', png, label }, ...(autoRun ? { autoRun } : {}) });
+  }
+
   const notesMenu = [
-    {
-      label: t('notes.exportPdf'),
-      icon: 'download' as const,
-      disabled: true,
-      hint: t('common.comingSoon'),
-      onSelect: () => undefined,
-    },
+    { label: t('notes.exportPdf'), icon: 'download' as const, onSelect: () => setDialog('notesPdf') },
     {
       label: t('notes.exportDocx'),
       icon: 'download' as const,
-      disabled: true,
-      hint: t('common.comingSoon'),
-      onSelect: () => undefined,
+      onSelect: () =>
+        void quickExport(async () => ({
+          blob: await notesDocx(currentNotes(), notebook.title),
+          name: safeFileName(notebook.title, 'docx'),
+        })),
     },
     { label: t('notebooks.rename'), icon: 'pencil' as const, onSelect: () => setDialog('rename') },
     { label: t('common.delete'), icon: 'trash' as const, danger: true, onSelect: () => setDialog('delete') },
@@ -297,10 +360,12 @@ export function Editor({
           view={tab}
           onView={onTab}
           menu={notesMenu}
+          onAi={() => openAi(page?.elements ?? [], t('ai.thisPage'))}
         />
         <div className="min-h-0 flex-1">
-          <NotesEditor notebookId={notebook.id} onStatus={onNotesStatus} />
+          <NotesEditor notebookId={notebook.id} onStatus={onNotesStatus} contentRef={notesContent} />
         </div>
+        {exportDialogs}
         {dialog === 'rename' && <RenameNotebookDialog notebook={notebook} onClose={() => setDialog(null)} />}
         {dialog === 'delete' && (
           <DeleteNotebookDialog
@@ -330,6 +395,7 @@ export function Editor({
           onView={onTab}
           mode={{ value: mode, onChange: (m) => void switchMode(m) }}
           menu={menu}
+          onAi={() => openAi(page?.elements ?? [], t('ai.thisPage'))}
         />
       )}
       <div ref={bodyRef} className="relative min-h-0 flex-1">
@@ -351,6 +417,7 @@ export function Editor({
             insets={insets}
             onChange={(els) => editor.setElements(page.id, els)}
             onPageFull={() => toast.error(t('whiteboard.pageFull'))}
+            onAiSelection={(els, action) => openAi(els, t('ai.selection'), action)}
             label={
               mode === 'paged'
                 ? t('whiteboard.canvasPaged', {
@@ -411,12 +478,22 @@ export function Editor({
           onFit={() => setView(FIT)}
         />
       )}
+      {exportDialogs}
       {dialog === 'rename' && <RenameNotebookDialog notebook={notebook} onClose={() => setDialog(null)} />}
       {dialog === 'delete' && (
         <DeleteNotebookDialog
           notebook={notebook}
           onClose={() => setDialog(null)}
           onDeleted={() => navigate('/notebooks')}
+        />
+      )}
+      {ai && (
+        <AiPanel
+          source={ai.source}
+          actions={['handwriting', 'explain', 'translate']}
+          autoRun={ai.autoRun}
+          notebookId={notebook.id}
+          onClose={() => setAi(null)}
         />
       )}
       {confirmPaged && (

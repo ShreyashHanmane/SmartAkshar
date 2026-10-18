@@ -67,7 +67,7 @@ test('opens with the design’s top bar, toolbar, and bottom bar', async ({ page
     await expect(toolbar.getByRole('button', { name })).toBeVisible();
   await expect(toolbar.getByRole('radio')).toHaveCount(5);
   await expect(toolbar.getByRole('slider')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'AI study help' })).toHaveAttribute('aria-disabled', 'true');
+  await expect(page.getByRole('button', { name: 'AI study help' })).toBeEnabled();
   // The mobile tab bar is hidden inside the whiteboard.
   await expect(page.getByRole('navigation', { name: 'Sections' })).toHaveCount(0);
 });
@@ -144,7 +144,7 @@ test('eraser removes everything inside the circle', async ({ page }) => {
   await expect.poll(async () => (await elementsOf()).length).toBe(1);
 });
 
-test('lasso selects, moves, and erases; AI actions wait for the AI module', async ({ page }) => {
+test('lasso selects, moves, and erases; offers AI actions', async ({ page }) => {
   await draw(page, [
     [0.45, 0.4],
     [0.55, 0.45],
@@ -156,7 +156,7 @@ test('lasso selects, moves, and erases; AI actions wait for the AI module', asyn
   const menu = page.getByRole('toolbar', { name: '1 selected' });
   await expect(menu).toBeVisible();
   for (const name of ['Convert to text', 'Explain', 'Translate'])
-    await expect(menu.getByRole('button', { name })).toHaveAttribute('aria-disabled', 'true');
+    await expect(menu.getByRole('button', { name })).toBeEnabled();
 
   // Drag the selection.
   await draw(page, [
@@ -258,7 +258,7 @@ test('toolbar docks, collapses, and remembers its position', async ({ page }) =>
 
 test('rename, focus mode, and delete from the menu', async ({ page }) => {
   await page.getByRole('button', { name: 'More options' }).click();
-  await expect(page.getByRole('menuitem', { name: 'Export PDF' })).toHaveAttribute('aria-disabled', 'true');
+  await expect(page.getByRole('menuitem', { name: 'Export PDF' })).not.toHaveAttribute('aria-disabled');
   await page.getByRole('menuitem', { name: 'Rename' }).click();
   await page.getByRole('dialog', { name: 'Rename notebook' }).getByLabel('Title').fill('Laws of Motion');
   await page.getByRole('button', { name: 'Save' }).click();

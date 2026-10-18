@@ -137,6 +137,19 @@ const MIGRATIONS: string[] = [
   CREATE INDEX cards_deck ON cards(user_id, deck_id);
   CREATE INDEX cards_due ON cards(user_id, due);
   `,
+  // v3: daily AI usage per user (quota).
+  `
+  CREATE TABLE ai_usage (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    day TEXT NOT NULL,
+    count INTEGER NOT NULL,
+    PRIMARY KEY (user_id, day)
+  );
+  `,
+  // v4: profile photo (file name of an image owned by the user, or NULL).
+  `
+  ALTER TABLE users ADD COLUMN avatar TEXT;
+  `,
 ];
 
 export type Db = DatabaseSync;

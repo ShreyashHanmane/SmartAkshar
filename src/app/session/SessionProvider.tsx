@@ -1,5 +1,5 @@
 import { type ReactNode, createContext, useContext, useEffect, useState } from 'react';
-import { observeSession } from '../../data/auth';
+import { observeSession, watchAccount } from '../../data/auth';
 import type { SessionState } from './guards';
 
 const SessionContext = createContext<SessionState>({ status: 'loading' });
@@ -11,6 +11,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     () => observeSession((user) => setSession(user ? { status: 'signedIn', user } : { status: 'signedOut' })),
     [],
   );
+
+  const signedInUid = session.status === 'signedIn' ? session.user.uid : null;
+  useEffect(() => (signedInUid ? watchAccount() : undefined), [signedInUid]);
 
   return <SessionContext.Provider value={session}>{children}</SessionContext.Provider>;
 }

@@ -68,7 +68,7 @@ Open the published design and the running app. Produce a table of EVERY interact
 - Never say "done" or "works" without evidence (command output, test names). If something failed or you could not test it, say so.
 - Never disable, skip, or weaken tests, lint, type checks, or security rules just to get green.
 - If something is unclear, ask ONE question at a time. Do not invent features.
-- No dead controls: every button, menu item, toggle, and gesture must do its real job. If something truly cannot be built yet, disable it with a "Coming soon" tooltip and list it in the report. Never leave fake or mock actions or hard-coded demo data in real code paths.
+- No dead controls: every button, menu item, toggle, and gesture must do its real job. If something truly cannot be built yet, disable it with a "Coming soon" tooltip and list it in the report. Never leave fake or mock actions or hard-coded demo data in real code paths. Exception (approved 2026-10-18): every new account gets real, editable starter content (4 subjects, 4 decks with sample cards) from `server/starter.ts`; users can rename or delete it like their own data.
 
 ## 5. Locked product decisions (mine; do not change without asking)
 
@@ -256,7 +256,7 @@ Every module must handle loading, empty, error, offline, and success states; des
 
 ## 12. Open items (ask me; do not decide alone)
 
-- Which AI provider to use, and the daily quota per user.
+- ~~Which AI provider to use, and the daily quota per user.~~ Decided: Google Gemini via the local server, 20 requests per user per day.
 - Which interface languages to ship first.
 - Maximum upload sizes.
 - Deployment target and domain.

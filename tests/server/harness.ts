@@ -3,12 +3,17 @@ import type { AddressInfo } from 'node:net';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { createApp } from '../../server/app.ts';
+import type { AiProvider } from '../../server/ai/provider.ts';
 
 /** Starts a server on a random port with a fresh data folder inside the project. */
-export async function startServer() {
+export async function startServer(options: { ai?: AiProvider; log?: (m: string) => void } = {}) {
   const dataDir = resolve('.tmp-test', randomBytes(6).toString('hex'));
   mkdirSync(dataDir, { recursive: true });
-  const app = createApp({ dataDir });
+  const app = createApp({
+    dataDir,
+    ...(options.ai ? { ai: options.ai } : {}),
+    ...(options.log ? { log: options.log } : {}),
+  });
   await new Promise<void>((r) => app.server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
   return {
@@ -58,8 +63,8 @@ export class Client {
     });
   }
 
-  async signUp(username: string, password = 'study1234', name = username) {
-    const res = await this.json('POST', '/api/auth/signup', { name, username, password });
+  async signUp(username: string, password = 'study1234', name = username, starter = false) {
+    const res = await this.json('POST', '/api/auth/signup', { name, username, password, starter });
     if (res.status !== 201) throw new Error(`signup failed ${res.status}`);
     return this;
   }

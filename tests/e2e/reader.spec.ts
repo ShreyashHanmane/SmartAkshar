@@ -110,8 +110,8 @@ test('highlights PDF text, keeps it after reload, and removes it', async ({ page
     'aria-disabled',
     'true',
   );
-  for (const name of ['Explain', 'Summarize', 'Translate'])
-    await expect(menu.getByRole('button', { name })).toHaveAttribute('aria-disabled', 'true');
+  for (const name of ['Create flashcard', 'Explain', 'Summarize', 'Translate'])
+    await expect(menu.getByRole('button', { name })).not.toHaveAttribute('aria-disabled', 'true');
   await menu.getByRole('button', { name: 'Highlight' }).click();
   await expect
     .poll(async () => ((await apiGet<unknown[]>(page, `/api/books/${book.id}/highlights`)) ?? []).length)

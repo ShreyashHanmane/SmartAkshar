@@ -4,6 +4,8 @@ import { extname, join, normalize, resolve } from 'node:path';
 import { type Db, openDb } from './db.ts';
 import { EventHub } from './events.ts';
 import { HttpError, sendJson } from './http.ts';
+import { aiRun, aiStatus } from './ai/route.ts';
+import type { AiProvider } from './ai/provider.ts';
 import { type Ctx, match, matchFile, serveImage } from './routes.ts';
 import { checkCsrf, setSecurityHeaders } from './security.ts';
 
@@ -12,8 +14,10 @@ export interface AppOptions {
   dataDir: string;
   /** Built front end to serve (production); omit in development (Vite serves it). */
   distDir?: string | undefined;
-  /** Log unexpected errors (metadata only, never request bodies). */
+  /** Log unexpected errors and AI usage (metadata only, never request bodies). */
   log?: (message: string) => void;
+  /** AI provider; null or omitted turns AI off ("Not configured"). */
+  ai?: AiProvider | null;
 }
 
 const TYPES: Record<string, string> = {
@@ -79,6 +83,9 @@ export function createApp(options: AppOptions): { server: Server; db: Db; hub: E
         };
         const image = method === 'GET' ? matchFile(url.pathname) : null;
         if (image) return serveImage(ctx, image);
+        const aiCtx = { req, res, db, ai: options.ai ?? null, log: options.log };
+        if (method === 'GET' && url.pathname === '/api/ai/status') return aiStatus(aiCtx);
+        if (method === 'POST' && url.pathname === '/api/ai/run') return await aiRun(aiCtx);
         const found = match(method, url.pathname);
         if (!found) throw new HttpError(404, 'not-found');
         ctx.params = found.params;
