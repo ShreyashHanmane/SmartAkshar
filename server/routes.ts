@@ -69,6 +69,7 @@ export interface Ctx {
 type Handler = (ctx: Ctx) => Promise<void> | void;
 interface Route {
   method: string;
+  path: string;
   pattern: RegExp;
   handler: Handler;
 }
@@ -78,7 +79,12 @@ function route(method: string, path: string, handler: Handler) {
   const pattern = new RegExp(
     `^${path.replace(/:(\w+)/g, (_, name: string) => `(?<${name}>[A-Za-z0-9_-]{1,40})`)}$`,
   );
-  routes.push({ method, pattern, handler });
+  routes.push({ method, path, pattern, handler });
+}
+
+/** Every API route as "METHOD /path/:param" (used by the authorization tests). */
+export function routeTable(): { method: string; path: string }[] {
+  return routes.map(({ method, path }) => ({ method, path }));
 }
 
 export function match(method: string, path: string) {

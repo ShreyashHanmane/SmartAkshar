@@ -337,3 +337,22 @@
 **Open item for you:** the repo has no exported logo file. The app icons are cut from the original logo in the design screenshots (about 41 px source), so they're slightly soft at 512 px. Nothing was redrawn. Please export the logo mark from Figma (SVG or a large PNG) into `public/icons/`, and I'll regenerate the sizes and add the mark to the in-app wordmark.
 
 **Tests:** `tests/e2e/pwa.spec.ts` covers the manifest and icon sizes; the service worker taking control; no `/api` entry in any cache; the app opening offline and recovering; and caches after sign-out. Full suite: 225 passed, 3 skipped by design.
+
+## Module 12: Security and quality pass (branch `feat/hardening`) — in progress
+
+**Done so far**
+
+- `tests/server/security.test.ts` walks the server's real route table, so routes added later are covered too:
+  - Every non-public route returns 401 without a session.
+  - Every write is rejected without the CSRF header or from a foreign origin.
+  - Another user calling every route with Alice's ids gets none of her data, and her full export is byte-for-byte unchanged afterwards. A deliberately injected leak was caught.
+  - Security headers are present on API responses and errors.
+- **Fixed:** the server could be bound to the network through the `HOST` variable. It now refuses any address that isn't loopback.
+- `tests/e2e/quality.spec.ts`:
+  - No console errors or uncaught exceptions on any main screen.
+  - The page itself is served with the security headers.
+  - A no-dependency accessibility check: controls have names, inputs have labels, images have alt text, touch targets are at least 44 px. **Fixed:** the dashboard's "Open library" link was 24 px tall.
+- Git history scanned for secrets: clean. The only committed env file holds placeholders.
+- `npm audit`: 0 vulnerabilities.
+
+**Left:** Lighthouse is not installed and would need a new package, so it hasn't been run; ask before adding it. Also left: a final review of upload limits and of the error boundary, then the module report.

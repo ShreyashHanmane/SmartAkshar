@@ -255,7 +255,10 @@ export function DashboardPage() {
           <h2 id="recent-books" className="text-2xl font-semibold text-ink">
             {t('dashboard.recentBooks')}
           </h2>
-          <Link to="/library" className="font-semibold text-accent underline-offset-2 hover:underline">
+          <Link
+            to="/library"
+            className="inline-flex min-h-11 items-center font-semibold text-accent underline-offset-2 hover:underline"
+          >
             {t('dashboard.openLibrary')}
           </Link>
         </div>

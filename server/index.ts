@@ -11,7 +11,13 @@ import { createApp } from './app.ts';
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 
 const port = Number(process.env.PORT ?? 5174);
+// Loopback only: exposing the server to the network needs HTTPS and a deliberate decision (CLAUDE.md §7.2).
+const LOOPBACK = new Set(['127.0.0.1', '::1', 'localhost']);
 const host = process.env.HOST ?? '127.0.0.1';
+if (!LOOPBACK.has(host)) {
+  console.error(`Refusing to listen on ${host}: AKSHAR only runs on this computer (127.0.0.1).`);
+  process.exit(1);
+}
 const dataDir = resolve(process.env.AKSHAR_DATA_DIR ?? 'data');
 const distDir =
   process.env.AKSHAR_SERVE_DIST === '0' ? undefined : resolve(process.env.AKSHAR_DIST ?? 'dist');
