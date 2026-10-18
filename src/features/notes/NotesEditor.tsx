@@ -2,7 +2,7 @@ import Image from '@tiptap/extension-image';
 import { type Editor, EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import DOMPurify from 'dompurify';
-import { type FormEvent, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { type FormEvent, type RefObject, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { DocSaver } from '../../app/save/DocSaver';
 import { ApiError } from '../../data/api';
 import { useSignedInUser } from '../../app/session/SessionProvider';
@@ -18,7 +18,7 @@ import { TextField } from '../../ui/TextField';
 import { useToast } from '../../ui/Toast';
 import { useServerReachable } from '../../ui/useOnline';
 import { PAGE_BYTES_LIMIT, type SaveStatus, saveStatus } from '../whiteboard/saveState';
-import { cleanContent, isOwnImage, isSafeHref } from '../../shared/clean';
+import { type JsonNode, cleanContent, isOwnImage, isSafeHref } from '../../shared/clean';
 
 /** Sanitises pasted HTML before ProseMirror parses it: no scripts, no unsafe links, no foreign images. */
 function sanitizePaste(html: string): string {
@@ -167,9 +167,12 @@ function LinkDialog({
 export function NotesEditor({
   notebookId,
   onStatus,
+  contentRef,
 }: {
   notebookId: string;
   onStatus: (s: SaveStatus, retry: () => void) => void;
+  /** Receives a getter for the current (cleaned) content, for export; null until loaded. */
+  contentRef?: RefObject<(() => JsonNode | null) | null>;
 }) {
   const user = useSignedInUser();
   const toast = useToast();
@@ -291,6 +294,8 @@ export function NotesEditor({
   useEffect(() => {
     editorRef.current = editor;
     insertImageRef.current = insertImage;
+    if (contentRef)
+      contentRef.current = () => (editor && loaded.current ? cleanContent(editor.getJSON()) : null);
   });
 
   // Save pending edits when leaving.

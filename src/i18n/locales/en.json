@@ -475,5 +475,17 @@
   "ai.error.timeout": "AI took too long to answer. Try again, or with less text.",
   "ai.error.blocked": "AI couldn't answer this request.",
   "ai.error.provider": "AI isn't available right now. Try again in a moment.",
-  "ai.error.invalid": "That's too much to send at once. Try a shorter selection."
+  "ai.error.invalid": "That's too much to send at once. Try a shorter selection.",
+  "export.export": "Export",
+  "export.working": "Exporting…",
+  "export.preparing": "Preparing your export…",
+  "export.saved": "Saved {name} to your downloads.",
+  "export.failed": "The export didn't work. Please try again.",
+  "export.progress": "Export progress",
+  "export.pageOf": "Page {done} of {total}",
+  "export.pages": "Pages to export",
+  "export.thisPage": "This page ({n})",
+  "export.allPages": "All pages ({count})",
+  "export.notesPdfHint": "Your typed notes as an A4 PDF, including images.",
+  "export.csv": "Export CSV"
 }

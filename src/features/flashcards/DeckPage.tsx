@@ -6,6 +6,7 @@ import {
   type Deck,
   deleteCard,
   deleteDeck,
+  loadCards,
   subscribeCards,
   subscribeDecks,
 } from '../../data/decks';
@@ -17,6 +18,8 @@ import { Dialog } from '../../ui/Dialog';
 import { Menu } from '../../ui/Menu';
 import { useToast } from '../../ui/Toast';
 import { DeckDialog, EditCardDialog, NewCardForm } from './dialogs';
+import { useQuickExport } from '../export/ExportDialog';
+import { deckCsv, safeFileName } from '../export/exporters';
 
 export function DeckPage() {
   const { deckId = '' } = useParams();
@@ -25,6 +28,7 @@ export function DeckPage() {
   const decks = useLive<Deck[]>('decks', (next, fail) => subscribeDecks(next, fail));
   const cards = useLive<Card[]>(deckId, (next, fail) => subscribeCards(deckId, next, fail));
   const [dialog, setDialog] = useState<'rename' | 'delete' | null>(null);
+  const quickExport = useQuickExport();
   const [editing, setEditing] = useState<Card | null>(null);
   const deck = decks.status === 'ready' ? decks.data.find((d) => d.id === deckId) : undefined;
 
@@ -71,6 +75,15 @@ export function DeckPage() {
               label={t('flashcards.deckActions')}
               items={[
                 { label: t('notebooks.rename'), icon: 'pencil', onSelect: () => setDialog('rename') },
+                {
+                  label: t('export.csv'),
+                  icon: 'download',
+                  onSelect: () =>
+                    void quickExport(async () => ({
+                      blob: deckCsv(deck.title, await loadCards(deck.id)),
+                      name: safeFileName(deck.title, 'csv'),
+                    })),
+                },
                 {
                   label: t('common.delete'),
                   icon: 'trash',

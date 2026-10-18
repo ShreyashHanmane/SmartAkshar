@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { type ImageKind, IMAGE_EXT } from '../shared/images';
+import { isOwnImage } from '../shared/clean';
 import { getJson, request, send } from './api';
 import { live } from './events';
 
@@ -55,4 +56,10 @@ export async function appendToNote(notebookId: string, text: string): Promise<vo
   await send('PUT', `/api/notebooks/${enc(notebookId)}/note`, {
     content: { type: 'doc', content: [...(doc.content ?? []), ...paragraphs] },
   });
+}
+
+/** Downloads one of the user's own note images (only local upload URLs are fetched). */
+export async function loadNoteImage(src: string): Promise<Blob | null> {
+  if (!isOwnImage(src)) return null;
+  return (await request('GET', src)).blob();
 }
