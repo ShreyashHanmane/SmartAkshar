@@ -107,7 +107,7 @@ Status: works / broken / UI-only / missing / disabled (Coming soon). "Module" re
 - **Notes editor:** Tiptap.
 - **AI side panel / bottom sheet: works.** Summarize, explain, translate, flashcards from text, handwriting to text; cancel, errors, daily usage, copy / insert into notes / save as flashcards. Reader header: summarize this page or the whole book.
 - **Exports: works.** Whiteboard PDF (this page / all pages) and PNG; notes PDF and DOCX; deck CSV; full ZIP from Settings.
-- **Offline / PWA.**
+- **Offline / PWA: works.** Installable (manifest, icons, service worker); the app opens while the server is stopped and shows the server-unreachable screen; edits retry when the server is back; Settings shows sync status and an Install button.
 - **Missing states on every screen:** empty, loading (skeleton), error, offline, save confirmations and toasts.
 
 ## Design ↔ CLAUDE.md conflicts to resolve (I'll ask one at a time)

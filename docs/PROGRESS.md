@@ -322,3 +322,18 @@
 **Tests:** 4 server tests (photo set, replace and remove, owner-only access, disguised, oversize and GIF rejected; storage numbers; delete rate limit), a sync-summary unit test, and 4 e2e scenarios on desktop, tablet and mobile. I reviewed screenshots of Settings in light, dark and paper themes at all three sizes.
 
 **Not covered by an automated test:** the sign-out "unsaved changes" warning. It only appears while a save is in flight or failing, which can't be reproduced reliably in e2e; the logic is a single check of the tested sync summary.
+
+## Module 11: Offline and PWA (branch `feat/pwa`)
+
+**Status:** complete.
+
+**Done**
+
+- **Installable:** web manifest, 192 and 512 px icons plus a maskable icon, an apple-touch icon, a favicon and the theme colour. Settings → Data has "Install the app": an Install button when the browser offers it, "Installed" when running as an app, and a pointer to the browser menu otherwise.
+- **Service worker** (no dependency; generated at build): precaches the app shell and code. Fonts and pdf.js data are cached when first used. It never caches `/api/`. Old caches are removed when a new build activates.
+- **Server unreachable:** the app still opens from the cache and shows "Can't reach the AKSHAR server" with Reload, then recovers when the server is back.
+- **Sync status and retry:** whiteboard and notes edits made while the server is unreachable stay queued and retry with backoff (existing e2e test). Settings shows the live sync status (Module 10).
+
+**Open item for you:** the repo has no exported logo file. The app icons are cut from the original logo in the design screenshots (about 41 px source), so they're slightly soft at 512 px. Nothing was redrawn. Please export the logo mark from Figma (SVG or a large PNG) into `public/icons/`, and I'll regenerate the sizes and add the mark to the in-app wordmark.
+
+**Tests:** `tests/e2e/pwa.spec.ts` covers the manifest and icon sizes; the service worker taking control; no `/api` entry in any cache; the app opening offline and recovering; and caches after sign-out. Full suite: 225 passed, 3 skipped by design.

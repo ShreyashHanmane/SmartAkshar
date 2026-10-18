@@ -69,6 +69,12 @@ data/            Local database (akshar.db) and uploaded files — gitignored, c
 - **On the server** (`server/export.ts`, `GET /api/export`): a streamed ZIP with `data.json`, the user's files and a README. It's owner-only and contains no credentials.
 - `src/shared/zip.ts` is a small ZIP writer and reader (CompressionStream), shared by both.
 
+## Installable app (PWA)
+
+- `public/manifest.webmanifest` and `public/icons/`. The icons are cut from the original logo in the design screenshots; replace them with exported logo files when available.
+- `src/pwa/sw.js` becomes `/sw.js` at build time, with a versioned list of the built JS and CSS files (`vite.config.ts`). It caches only static files: code, styles, fonts, icons and pdf.js data. Pages fetch fresh from the network and fall back to the cached app shell. **`/api/` is never cached**, so no user data sits in Cache Storage, and sign-out deletes the caches anyway.
+- It's registered in production builds only. Without the server, the cached shell shows "Can't reach the AKSHAR server" with Reload. Unsaved edits stay in memory and retry with backoff (whiteboard and notes savers), and Settings shows the sync status.
+
 ## Starter content
 
 New accounts get 4 subjects (Physics, Mathematics, Chemistry, History) and 4 decks with sample cards (`server/starter.ts`), inserted in the same transaction as the account. They're ordinary data that the user can edit or delete.

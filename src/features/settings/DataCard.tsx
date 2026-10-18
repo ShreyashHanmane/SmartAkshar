@@ -12,6 +12,7 @@ import { TextField } from '../../ui/TextField';
 import { useServerReachable } from '../../ui/useOnline';
 import { authErrorMessage } from '../auth/errors';
 import { ExportAllButton } from './ExportAllButton';
+import { promptInstall, useInstallState } from '../../pwa/install';
 import { Card, Row } from './SettingsPage';
 
 /** Human-readable size: "0 B", "740 KB", "12.3 MB". */
@@ -81,6 +82,25 @@ function SyncRow() {
           <span aria-hidden="true" className={`size-2.5 rounded-full ${dot}`} />
           {message}
         </span>
+      }
+    />
+  );
+}
+
+function InstallRow() {
+  const state = useInstallState();
+  return (
+    <Row
+      title={t('settings.install')}
+      description={state === 'unavailable' ? t('settings.installManual') : t('settings.installHint')}
+      control={
+        state === 'installed' ? (
+          <span className="text-sm font-semibold text-ink">{t('settings.installed')}</span>
+        ) : state === 'available' ? (
+          <Button variant="secondary" icon="download" onClick={() => void promptInstall()}>
+            {t('settings.installButton')}
+          </Button>
+        ) : null
       }
     />
   );
@@ -160,6 +180,7 @@ export function DataCard() {
         />
         <StorageRow />
         <SyncRow />
+        <InstallRow />
       </Card>
       <Card title={t('settings.dangerZone')}>
         <Row

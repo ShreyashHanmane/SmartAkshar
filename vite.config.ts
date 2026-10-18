@@ -1,5 +1,6 @@
 /// <reference types="vitest/config" />
-import { cpSync, createReadStream, existsSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { cpSync, createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { join, normalize, resolve } from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
@@ -40,8 +41,37 @@ function pdfjsAssets(): Plugin {
   };
 }
 
+/**
+ * Builds /sw.js from src/pwa/sw.js with the list of files to keep for opening
+ * the app while the local server is stopped (code and styles; fonts and pdf.js
+ * data are cached the first time they're used).
+ */
+function serviceWorker(): Plugin {
+  return {
+    name: 'akshar-service-worker',
+    apply: 'build',
+    generateBundle(_options, bundle) {
+      const files = Object.keys(bundle)
+        .filter((f) => f.startsWith('assets/') && /\.(m?js|css)$/.test(f))
+        .sort();
+      const precache = [
+        '/index.html',
+        '/manifest.webmanifest',
+        '/icons/icon-192.png',
+        '/icons/favicon-48.png',
+        ...files.map((f) => `/${f}`),
+      ];
+      const version = createHash('sha256').update(precache.join('\n')).digest('hex').slice(0, 12);
+      const source = readFileSync(resolve('src/pwa/sw.js'), 'utf8')
+        .replace("'__VERSION__'", JSON.stringify(version))
+        .replace('/* __PRECACHE__ */ []', JSON.stringify(precache));
+      this.emitFile({ type: 'asset', fileName: 'sw.js', source });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss(), pdfjsAssets()],
+  plugins: [react(), tailwindcss(), pdfjsAssets(), serviceWorker()],
   build: {
     sourcemap: false,
   },

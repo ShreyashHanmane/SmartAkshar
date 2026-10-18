@@ -1,0 +1,17 @@
+{
+  "name": "AKSHAR — Smart Study Space",
+  "short_name": "AKSHAR",
+  "description": "Handwritten notebooks, a book reader, flashcards and AI study help.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f5fbff",
+  "theme_color": "#1270c4",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

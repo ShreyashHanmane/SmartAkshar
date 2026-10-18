@@ -533,5 +533,10 @@
   "auth.signOutUnsavedTitle": "Some changes aren't saved yet",
   "auth.signOutUnsaved": "If you sign out now, the latest changes that haven't reached the AKSHAR server will be lost.",
   "auth.staySignedIn": "Stay signed in",
-  "auth.signOutAnyway": "Sign out anyway"
+  "auth.signOutAnyway": "Sign out anyway",
+  "settings.install": "Install the app",
+  "settings.installHint": "Open AKSHAR in its own window, even while the server is starting up.",
+  "settings.installManual": "To install, use your browser's menu (for example \"Install AKSHAR\" or \"Add to Home screen\").",
+  "settings.installButton": "Install AKSHAR",
+  "settings.installed": "Installed"
 }
