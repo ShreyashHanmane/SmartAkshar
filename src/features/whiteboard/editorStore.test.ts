@@ -1,0 +1,119 @@
+import { describe, expect, it, vi } from 'vitest';
+import { EditorStore, SAVE_DEBOUNCE_MS, type StoreDeps, type StorePage } from './editorStore';
+import type { Element } from './model';
+
+const el = (id: string): Element => ({
+  kind: 'shape',
+  id,
+  shape: 'line',
+  color: '#000000',
+  width: 2,
+  x1: 0,
+  y1: 0,
+  x2: 1,
+  y2: 1,
+});
+
+function setup(save: StoreDeps['save'] = () => Promise.resolve()) {
+  vi.useFakeTimers();
+  const saved: StorePage[] = [];
+  const deps: StoreDeps = {
+    save: (p) => {
+      saved.push(p);
+      return save(p);
+    },
+    addPage: (index) => ({ id: `new${index}`, done: Promise.resolve() }),
+    touch: vi.fn(),
+    measure: (els) => els.length * 100,
+    setTimer: (fn, ms) => setTimeout(fn, ms) as unknown as number,
+    clearTimer: (id) => clearTimeout(id),
+    now: () => Date.now(),
+  };
+  const store = new EditorStore(deps);
+  store.applyRemote([{ id: 'p0', index: 0, elements: [] }]);
+  return { store, saved, deps };
+}
+
+describe('EditorStore', () => {
+  it('debounces saves and reports saving -> saved', async () => {
+    const { store, saved } = setup();
+    store.setElements('p0', [el('a')]);
+    store.setElements('p0', [el('a'), el('b')]);
+    expect(store.getSnapshot().dirty).toBeGreaterThan(0);
+    expect(saved).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+    expect(saved).toHaveLength(1);
+    expect(saved[0]?.elements.map((e) => e.id)).toEqual(['a', 'b']);
+    const s = store.getSnapshot();
+    expect(s.dirty + s.inFlight).toBe(0);
+    vi.useRealTimers();
+  });
+
+  it('keeps local edits when a stale remote snapshot arrives', async () => {
+    let resolve: () => void = () => undefined;
+    const { store } = setup(() => new Promise<void>((r) => (resolve = r)));
+    store.setElements('p0', [el('local')]);
+    store.applyRemote([{ id: 'p0', index: 0, elements: [el('remote')] }]);
+    expect(store.getSnapshot().pages[0]?.elements[0]?.id).toBe('local');
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+    // Still in flight: still ignore remote.
+    store.applyRemote([{ id: 'p0', index: 0, elements: [el('remote')] }]);
+    expect(store.getSnapshot().pages[0]?.elements[0]?.id).toBe('local');
+    resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    // Saved: remote updates apply again.
+    store.applyRemote([{ id: 'p0', index: 0, elements: [el('remote')] }]);
+    expect(store.getSnapshot().pages[0]?.elements[0]?.id).toBe('remote');
+    vi.useRealTimers();
+  });
+
+  it('retries rejected writes with backoff, then shows an error, and recovers on retry', async () => {
+    let fail = true;
+    const { store, saved } = setup(() => (fail ? Promise.reject(new Error('denied')) : Promise.resolve()));
+    store.setElements('p0', [el('a')]);
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+    for (const ms of [1000, 2000, 4000, 8000]) await vi.advanceTimersByTimeAsync(ms);
+    expect(saved).toHaveLength(5);
+    expect(store.getSnapshot().failed).toBe(true);
+    // Local data is never discarded.
+    expect(store.getSnapshot().pages[0]?.elements[0]?.id).toBe('a');
+    fail = false;
+    store.retry();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(store.getSnapshot().failed).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it('undo and redo restore page states and save them', async () => {
+    const { store, saved } = setup();
+    store.setElements('p0', [el('a')]);
+    store.setElements('p0', [el('a'), el('b')]);
+    store.undo();
+    expect(store.getSnapshot().pages[0]?.elements.map((e) => e.id)).toEqual(['a']);
+    store.redo();
+    expect(store.getSnapshot().pages[0]?.elements.map((e) => e.id)).toEqual(['a', 'b']);
+    store.undo();
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+    expect(saved.at(-1)?.elements.map((e) => e.id)).toEqual(['a']);
+    vi.useRealTimers();
+  });
+
+  it('refuses additions that would exceed the page size limit', () => {
+    const { store, deps } = setup();
+    deps.measure = () => 2_000_000;
+    expect(store.setElements('p0', [el('a')])).toBe('too-large');
+    expect(store.getSnapshot().pages[0]?.elements).toEqual([]);
+    // Removing content is always allowed.
+    expect(store.setElements('p0', [])).toBe('ok');
+    vi.useRealTimers();
+  });
+
+  it('adds pages and keeps unsent local pages across remote snapshots', () => {
+    const { store } = setup();
+    const id = store.newPage();
+    store.setElements(id, [el('x')]);
+    store.applyRemote([{ id: 'p0', index: 0, elements: [] }]);
+    expect(store.getSnapshot().pages.map((p) => p.id)).toEqual(['p0', id]);
+    vi.useRealTimers();
+  });
+});
