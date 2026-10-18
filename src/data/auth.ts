@@ -34,7 +34,9 @@ export interface SessionUser {
 export function toSessionUser(user: User): SessionUser {
   const providers = user.providerData.map((p) => p.providerId);
   const isGuest = user.isAnonymous;
-  const passwordOnly = providers.length > 0 && providers.every((p) => p === 'password');
+  // Fail safe: verification is required unless a federated provider (Google) is
+  // linked. providerData can be briefly empty right after account creation.
+  const passwordOnly = providers.every((p) => p === 'password');
   return {
     uid: user.uid,
     email: user.email,

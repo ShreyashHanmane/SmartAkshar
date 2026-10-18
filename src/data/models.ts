@@ -20,6 +20,7 @@ export const settingsSchema = z.object({
   textSize: z.enum(['sm', 'md', 'lg']).catch('md'),
   locale: z.enum(['en']).catch('en'),
   toolbarSide: z.enum(['left', 'right']).catch('left'),
+  weeklyGoalHours: z.number().int().min(1).max(80).catch(10),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 export const DEFAULT_SETTINGS: Settings = {
@@ -27,6 +28,7 @@ export const DEFAULT_SETTINGS: Settings = {
   textSize: 'md',
   locale: 'en',
   toolbarSide: 'left',
+  weeklyGoalHours: 10,
 };
 
 export const subjectSchema = z.object({

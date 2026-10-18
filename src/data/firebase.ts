@@ -1,6 +1,12 @@
 import { type FirebaseApp, initializeApp } from 'firebase/app';
 import { type Auth, connectAuthEmulator, getAuth } from 'firebase/auth';
-import { type Firestore, connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
+import {
+  type Firestore,
+  connectFirestoreEmulator,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from 'firebase/firestore';
 import { type FirebaseStorage, connectStorageEmulator, getStorage } from 'firebase/storage';
 import { parseFirebaseConfig } from './config';
 
@@ -24,7 +30,11 @@ export function getFirebase(): Clients {
   const config = parseFirebaseConfig(import.meta.env, import.meta.env.DEV);
   const app = initializeApp(config.options);
   const auth = getAuth(app);
-  const db = getFirestore(app);
+  // Persistent cache: pending writes survive reloads and the app works offline.
+  // Sign-out clears it (signOutAndClear) so shared devices don't leak data.
+  const db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  });
   const storage = getStorage(app);
 
   if (config.useEmulators) {

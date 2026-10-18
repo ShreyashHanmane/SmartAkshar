@@ -11,7 +11,12 @@ export function subscribeSettings(uid: string, next: (s: Settings) => void, fail
     profileRef(uid),
     (snap) => {
       const raw: unknown = snap.data()?.settings;
-      next(raw === undefined ? DEFAULT_SETTINGS : settingsSchema.parse(raw));
+      next(
+        settingsSchema.parse({
+          ...DEFAULT_SETTINGS,
+          ...(typeof raw === 'object' && raw !== null ? raw : {}),
+        }),
+      );
     },
     fail,
   );

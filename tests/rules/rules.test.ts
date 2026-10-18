@@ -5,7 +5,17 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { deleteDoc, doc, getDoc, serverTimestamp, setDoc, Timestamp, updateDoc } from 'firebase/firestore';
+import {
+  deleteDoc,
+  doc,
+  getDoc,
+  increment,
+  serverTimestamp,
+  setDoc,
+  Timestamp,
+  updateDoc,
+  writeBatch,
+} from 'firebase/firestore';
 import { getBytes, ref, uploadString } from 'firebase/storage';
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 
@@ -128,12 +138,110 @@ describe('subjects', () => {
   });
 });
 
+const notebook = (patch: Record<string, unknown> = {}) => ({
+  title: 'Classical Mechanics',
+  subjectId: null,
+  mode: 'paged',
+  paper: 'dots',
+  background: 'white',
+  pageCount: 1,
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+  ...patch,
+});
+
+describe('notebooks and pages', () => {
+  it('lets the owner create a notebook with its first page in one batch', async () => {
+    const db = alice();
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'users/alice/notebooks/n1'), notebook());
+    batch.set(doc(db, 'users/alice/notebooks/n1/pages/p0'), {
+      index: 0,
+      elements: [],
+      updatedAt: serverTimestamp(),
+    });
+    await assertSucceeds(batch.commit());
+    await assertSucceeds(
+      updateDoc(doc(db, 'users/alice/notebooks/n1'), { mode: 'infinite', updatedAt: serverTimestamp() }),
+    );
+    await assertSucceeds(deleteDoc(doc(db, 'users/alice/notebooks/n1/pages/p0')));
+    await assertSucceeds(deleteDoc(doc(db, 'users/alice/notebooks/n1')));
+  });
+
+  it('validates notebook fields', async () => {
+    const ref = doc(alice(), 'users/alice/notebooks/n1');
+    await assertFails(setDoc(ref, notebook({ title: '' })));
+    await assertFails(setDoc(ref, notebook({ title: 'x'.repeat(121) })));
+    await assertFails(setDoc(ref, notebook({ mode: 'spiral' })));
+    await assertFails(setDoc(ref, notebook({ paper: 'music' })));
+    await assertFails(setDoc(ref, notebook({ pageCount: 0 })));
+    await assertFails(setDoc(ref, notebook({ pageCount: 1.5 })));
+    await assertFails(setDoc(ref, notebook({ owner: 'bob' })));
+  });
+
+  it('validates pages', async () => {
+    const ref = (id: string) => doc(alice(), `users/alice/notebooks/n1/pages/${id}`);
+    await assertSucceeds(
+      setDoc(ref('p1'), { index: 1, elements: [{ k: 's' }], updatedAt: serverTimestamp() }),
+    );
+    await assertFails(setDoc(ref('p2'), { index: -1, elements: [], updatedAt: serverTimestamp() }));
+    await assertFails(setDoc(ref('p3'), { index: 3, elements: 'x', updatedAt: serverTimestamp() }));
+    await assertFails(
+      setDoc(ref('p4'), { index: 4, elements: [], extra: true, updatedAt: serverTimestamp() }),
+    );
+    await assertFails(setDoc(ref('bad id!'), { index: 5, elements: [], updatedAt: serverTimestamp() }));
+  });
+
+  it("denies another student's notebooks and pages", async () => {
+    await seed('users/alice/notebooks/n1', { title: 'x' });
+    await seed('users/alice/notebooks/n1/pages/p0', { index: 0, elements: [] });
+    await assertFails(getDoc(doc(bob(), 'users/alice/notebooks/n1')));
+    await assertFails(getDoc(doc(bob(), 'users/alice/notebooks/n1/pages/p0')));
+    await assertFails(
+      setDoc(doc(bob(), 'users/alice/notebooks/n1/pages/p0'), {
+        index: 0,
+        elements: [],
+        updatedAt: serverTimestamp(),
+      }),
+    );
+    await assertFails(deleteDoc(doc(bob(), 'users/alice/notebooks/n1')));
+    await assertFails(getDoc(doc(anon(), 'users/alice/notebooks/n1')));
+  });
+});
+
+describe('study activity', () => {
+  const day = 'users/alice/activity/2026-10-18';
+
+  it('accepts small increments only', async () => {
+    await assertSucceeds(
+      setDoc(doc(alice(), day), { seconds: increment(60), updatedAt: serverTimestamp() }, { merge: true }),
+    );
+    await assertSucceeds(
+      setDoc(doc(alice(), day), { seconds: increment(60), updatedAt: serverTimestamp() }, { merge: true }),
+    );
+    await assertFails(
+      setDoc(doc(alice(), day), { seconds: increment(5000), updatedAt: serverTimestamp() }, { merge: true }),
+    );
+    await assertFails(
+      setDoc(doc(alice(), day), { seconds: 10, updatedAt: serverTimestamp() }, { merge: true }),
+    );
+  });
+
+  it('rejects bad day ids and other users', async () => {
+    await assertFails(
+      setDoc(doc(alice(), 'users/alice/activity/today'), { seconds: 60, updatedAt: serverTimestamp() }),
+    );
+    await assertFails(setDoc(doc(bob(), day), { seconds: 60, updatedAt: serverTimestamp() }));
+    await assertFails(getDoc(doc(bob(), day)));
+  });
+});
+
 describe('everything else', () => {
   it('denies unknown collections and paths outside /users/{uid}', async () => {
     await assertFails(setDoc(doc(alice(), 'public/x'), { a: 1 }));
     await assertFails(getDoc(doc(alice(), 'public/x')));
     await assertFails(setDoc(doc(alice(), 'users/alice/secrets/x'), { a: 1 }));
-    await assertFails(setDoc(doc(alice(), 'users/alice/notebooks/n1'), { title: 'x' }));
+    await assertFails(setDoc(doc(alice(), 'users/alice/cards/c1'), { front: 'x' }));
   });
 });
 

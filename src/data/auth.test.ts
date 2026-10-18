@@ -24,6 +24,9 @@ describe('toSessionUser', () => {
     expect(toSessionUser(user({ isAnonymous: true, providers: [] })).needsVerification).toBe(false);
     expect(toSessionUser(user({ isAnonymous: true, providers: [] })).isGuest).toBe(true);
   });
+  it('requires verification while provider data is still empty (fail safe)', () => {
+    expect(toSessionUser(user({ providers: [] })).needsVerification).toBe(true);
+  });
   it('does not require verification when Google is linked alongside a password', () => {
     expect(toSessionUser(user({ providers: ['password', 'google.com'] })).needsVerification).toBe(false);
   });
