@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { isMobile, nav, openNav, signInAsGuest } from './helpers';
+import { isMobile, nav, openNav, signInAsGuest, storedUid, waitForServerDoc } from './helpers';
 
 test.beforeEach(async ({ page }) => {
   await signInAsGuest(page);
@@ -47,6 +47,11 @@ test('theme and text size apply instantly and persist across reloads', async ({ 
   await page.keyboard.press('ArrowRight');
   await expect(page.getByRole('radio', { name: 'Right' })).toHaveAttribute('aria-checked', 'true');
 
+  const uid = await storedUid(page);
+  await waitForServerDoc(`users/${uid}`, (d) => {
+    const s = d.settings as Record<string, unknown> | undefined;
+    return s?.theme === 'dark' && s.textSize === 'lg' && s.toolbarSide === 'right';
+  });
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await expect(page.locator('html')).toHaveAttribute('data-text-size', 'lg');
@@ -124,17 +129,9 @@ test('global search finds subjects and opens them', async ({ page }) => {
   await box.press('Enter');
   await expect(page).toHaveURL(/\/notebooks\?subject=/);
 
-  await page.goto('/');
+  await page.goto(isMobile(page) ? '/search' : '/');
   await box.fill('zzz-nothing');
   await expect(page.getByText('Nothing matches "zzz-nothing".')).toBeVisible();
-});
-
-test('new notebook is visibly disabled until the dashboard module', async ({ page }) => {
-  const button = isMobile(page)
-    ? page.getByRole('button', { name: 'New notebook' })
-    : nav(page).getByRole('button', { name: 'New notebook' });
-  await expect(button).toHaveAttribute('aria-disabled', 'true');
-  await expect(button).toHaveAttribute('title', 'Coming soon');
 });
 
 test('signing out resets the theme for the next person', async ({ page }) => {

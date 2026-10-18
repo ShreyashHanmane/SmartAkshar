@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
+  greeting,
   oobCodes,
   signOutViaSettings,
   signIn,
@@ -30,11 +31,11 @@ test('sign up, verify email, sign out, and sign back in', async ({ page }) => {
 
   await verifyEmailViaEmulator(email);
   await page.getByRole('button', { name: "I've verified my email" }).click();
-  await expect(page.getByRole('heading', { name: 'Signed in as Asha' })).toBeVisible();
+  await expect(greeting(page, 'Asha')).toBeVisible();
 
   // Session survives a reload.
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Signed in as Asha' })).toBeVisible();
+  await expect(greeting(page, 'Asha')).toBeVisible();
 
   await page.evaluate(() => localStorage.setItem('akshar:test', 'cached'));
   await signOutViaSettings(page);
@@ -42,7 +43,7 @@ test('sign up, verify email, sign out, and sign back in', async ({ page }) => {
   expect(await storedUid(page)).toBeNull();
 
   await signIn(page, email, PASSWORD);
-  await expect(page.getByRole('heading', { name: 'Signed in as Asha' })).toBeVisible();
+  await expect(greeting(page, 'Asha')).toBeVisible();
 });
 
 test('wrong credentials show one generic error', async ({ page }) => {
@@ -93,7 +94,7 @@ test('forgot password sends a reset email without revealing accounts', async ({ 
 test('guest upgrades to an account and keeps the same uid', async ({ page }) => {
   await page.goto('/login');
   await page.getByRole('button', { name: 'Continue as guest' }).click();
-  await expect(page.getByRole('heading', { name: 'Signed in as Guest' })).toBeVisible();
+  await expect(greeting(page, 'Guest')).toBeVisible();
   const guestUid = await storedUid(page);
   expect(guestUid).toBeTruthy();
 
@@ -116,14 +117,14 @@ test('guest upgrades to an account and keeps the same uid', async ({ page }) => 
 
   await verifyEmailViaEmulator(email);
   await page.getByRole('button', { name: "I've verified my email" }).click();
-  await expect(page.getByRole('heading', { name: 'Signed in as Kabir' })).toBeVisible();
+  await expect(greeting(page, 'Kabir')).toBeVisible();
   expect(await storedUid(page)).toBe(guestUid);
 });
 
 test('guest sign-out discards the session after confirmation', async ({ page }) => {
   await page.goto('/login');
   await page.getByRole('button', { name: 'Continue as guest' }).click();
-  await expect(page.getByRole('heading', { name: 'Signed in as Guest' })).toBeVisible();
+  await expect(greeting(page, 'Guest')).toBeVisible();
   await signOutViaSettings(page, { guest: true });
   expect(await storedUid(page)).toBeNull();
 });
@@ -142,7 +143,7 @@ test('Google sign-in through the emulator popup', async ({ page }) => {
   await popup.locator('#email-input').fill(uniqueEmail('google'));
   await popup.locator('#display-name-input').fill('Gauri');
   await popup.getByRole('button', { name: /Sign in with Google/ }).click();
-  await expect(page.getByRole('heading', { name: 'Signed in as Gauri' })).toBeVisible();
+  await expect(greeting(page, 'Gauri')).toBeVisible();
 });
 
 test('offline state disables sign-in and explains why', async ({ page, context }) => {

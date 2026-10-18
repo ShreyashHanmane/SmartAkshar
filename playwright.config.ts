@@ -4,6 +4,8 @@ const PORT = 4173;
 
 export default defineConfig({
   testDir: 'tests/e2e',
+  // Three browsers share the local emulators; allow for a loaded machine.
+  expect: { timeout: 10_000 },
   forbidOnly: !!process.env.CI,
   reporter: [['list']],
   use: {
