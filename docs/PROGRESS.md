@@ -158,3 +158,27 @@
 - Google popup sign-in: Firebase loads Google's gapi script from apis.google.com even against the emulator, so this test depends on the live internet (about 4% flake measured). That single test may retry up to 2 times; its assertions are unchanged.
 - I removed my earlier attempt to pre-load that script on the login page, because it made every visitor load a Google script. It now loads only after someone clicks "Continue with Google".
 - The notebooks subject-filter e2e test failed once under full-suite load and then passed 30 of 30 in isolation. I'm watching it.
+
+## Module 5: Notes editor (branch `feat/notes`)
+
+**Status:** complete.
+
+**Decision (user, 2026-10-18):** typed notes live in a **Whiteboard | Notes** switch inside each notebook (`?view=notes`): one Tiptap note per notebook, with no new creation flow.
+
+**Done**
+
+- Tiptap editor: undo/redo, H1–H3, bold, italic, underline, strikethrough, inline code, bulleted and numbered lists, quote, code block, divider, link (dialog; only http/https/mailto; `rel="noopener noreferrer nofollow"`), and images (button, paste, drop).
+- Autosave with `DocSaver` (unit-tested): 800 ms debounce, retries with backoff, Error and Retry, never drops the latest edit, and stale retries can't overwrite newer saves. The Saved chip in the top bar is shared with the whiteboard. Remote updates apply only when there are no unsaved local edits and the editor isn't focused.
+- Security:
+  - Every load and save passes through `cleanContent`: allow-listed nodes and marks only, safe links only, images only from the owner's own Storage folder, depth and size caps.
+  - Pasted HTML is sanitised with DOMPurify before parsing.
+  - Image uploads are checked by magic bytes against the extension, use random object names, and live under `users/{uid}/notes/{notebookId}/`. Storage rules enforce type, name pattern, size (5 MB, guests 2 MB) and no overwrites.
+  - Deleting a notebook deletes its note and images.
+- Loading skeleton, error state, "too long to save" warning (900 kB), and an offline message for images.
+- Study time is tracked while the notes are open.
+- Mobile: the top bar puts the view and mode switches on their own row; the formatting bar scrolls horizontally.
+
+**Open issues**
+
+- Notes → PDF / DOCX export arrives with Module 9 (menu items disabled with "Coming soon").
+- Total per-user storage quotas (200 MB / guests 25 MB) can't be enforced in Storage rules alone. Planned with the Cloud Functions work (Modules 8 and 12); per-file limits are enforced now.
