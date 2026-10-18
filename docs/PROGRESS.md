@@ -222,3 +222,26 @@
 - Study time is tracked while reading.
 
 **Tests:** 7 new e2e scenarios on desktop, tablet and mobile (21 runs). They cover import of all three formats with metadata, filtering, rejecting a disguised file, PDF paging and resume, highlight persistence and removal, the EPUB sandbox (script and inline-handler content never runs, no tracker requests, external links stripped), EPUB and TXT highlights, notes linking with saved handwriting, and rename and delete (the file returns 404 afterwards).
+
+## Module 7: Flashcards (branch `feat/flashcards`)
+
+**Status:** complete.
+
+**Done**
+
+- **Decks:** create (title + subject), rename, delete (with their cards). Deck cards as in the design: subject label, "N cards · N due", learned-progress bar, Review and Quiz, empty-deck text. Live due-count badge on the sidebar.
+- **Cards:** create, edit and delete on the deck page and the Create tab. With no decks yet, the Create tab starts one. The form clears immediately so the next card can be typed straight away (restored if saving fails).
+- **Review:** due cards of one deck or all decks (the dashboard's "Review now"). Tap or Space to flip; swipe right or → for "Know it", left or ← for "Don't know"; buttons too. Forgotten cards come back once at the end of the session, followed by a summary.
+- **Leitner scheduler** (`src/shared/leitner.ts`, unit-tested, applied by the server): boxes 1–5 with 1, 2, 4, 8 and 16 days; knowing moves a card up a box, not knowing sends it back to box 1.
+- **Quiz:** up to 10 questions per round, the right answer plus up to 3 distinct distractors from the deck, immediate feedback, a score, and "Try again". Practice only; it doesn't change the schedule.
+- **Progress tab:** total, due today, reviewed today, cards per box (bar chart), learned per deck.
+- **Reader:** "Create flashcard" from selected text, with the answer prefilled from the selection.
+- **Server:** migration v2 adds `decks` and full card fields, plus routes for decks, cards, reviews, due cards and stats. All per-user and validated (text ≤ 2000 characters, 20,000-card cap); deleting a subject keeps its decks.
+
+**Bugs found and fixed**
+
+- Creating a deck from the Flashcards page did nothing: `onCreated?.(await createDeck(…))` skips evaluating its argument when there's no callback.
+- Review keyboard shortcuts stopped working after "Don't know" requeued the same card; they're now handled at window level (ignored while typing).
+- **Stale refetch race (found by a flaky notes test):** a live-update refetch that started before a save could arrive after it and briefly show older content. Saves now return the server's `updatedAt`; the whiteboard store and the notes editor ignore copies older than their latest confirmed save (unit-tested).
+
+**Tests:** 7 new e2e scenarios (deck and cards with due counts and badge; review by click, swipe and keyboard with schedule saved; quiz; edit and delete; Create and Progress tabs; flashcard from a PDF selection; dashboard Review now), 5 server tests and 7 scheduler unit tests. Full e2e suite: 172 passed, twice in a row.

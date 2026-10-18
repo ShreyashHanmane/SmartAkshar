@@ -11,7 +11,7 @@ Status: works / broken / UI-only / missing / disabled (Coming soon). "Module" re
 | Logo + tagline                        | Original Figma logo; recolored in dark                   | missing (SVG needed)                                     | 2      | `src/ui/Logo.tsx`                                |
 | Dashboard nav                         | Go to dashboard; active state                            | works                                                    | 2      | `src/app/shell/Sidebar.tsx`                      |
 | Whiteboard nav                        | Go to notebooks/whiteboard                               | works (opens the notebooks area; list built in Module 3) | 2      | `src/app/shell/Sidebar.tsx`                      |
-| Flashcards nav + due badge            | Go to flashcards; badge = real due-today count           | works for navigation; due badge missing (Module 7)       | 2, 7   | `src/app/shell/Sidebar.tsx`                      |
+| Flashcards nav + due badge            | Go to flashcards; badge = real due-today count           | works (live due count badge)                             | 2, 7   | `src/app/shell/Sidebar.tsx`                      |
 | Library nav                           | Go to library                                            | works (page built in Module 6)                           | 2      | `src/app/shell/Sidebar.tsx`                      |
 | Subjects list (dot, name, count)      | Filter by subject; counts from data                      | works (list, colour dot, count, filter link)             | 2      | `src/features/subjects/SubjectsNav.tsx`          |
 | Subject create / rename / delete      | Manage subjects (§9.2)                                   | works                                                    | 2      | `src/features/subjects/`                         |
@@ -56,15 +56,15 @@ Status: works / broken / UI-only / missing / disabled (Coming soon). "Module" re
 
 ## Flashcards (`flashcards-desktop-light.png`)
 
-| Element                                               | Expected behavior                          | Status  | Module | Target file                |
-| ----------------------------------------------------- | ------------------------------------------ | ------- | ------ | -------------------------- |
-| Tabs Decks / Progress / Create                        | Switch views                               | missing | 7      | `src/features/flashcards/` |
-| + Create deck (top right, partly hidden)              | Create deck                                | missing | 7      | same                       |
-| Deck card (subject, title, N cards · N due, progress) | Real counts                                | missing | 7      | same                       |
-| Review                                                | Swipe review (know / don't know → Leitner) | missing | 7      | same                       |
-| Quiz                                                  | Multiple-choice quiz                       | missing | 7      | same                       |
-| Empty deck state                                      | "Empty deck — add a card to begin."        | missing | 7      | same                       |
-| Card create / edit / delete, CSV export               | Per §5                                     | missing | 7, 9   | same                       |
+| Element                                               | Expected behavior                          | Status                                                       | Module | Target file                                  |
+| ----------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------ | ------ | -------------------------------------------- |
+| Tabs Decks / Progress / Create                        | Switch views                               | works                                                        | 7      | `src/features/flashcards/FlashcardsPage.tsx` |
+| + Create deck (top right, partly hidden)              | Create deck                                | works (title + subject)                                      | 7      | `src/features/flashcards/dialogs.tsx`        |
+| Deck card (subject, title, N cards · N due, progress) | Real counts                                | works (real counts; progress = cards learned)                | 7      | `src/features/flashcards/FlashcardsPage.tsx` |
+| Review                                                | Swipe review (know / don't know → Leitner) | works (flip, swipe, buttons, arrow keys; Leitner scheduling) | 7      | `src/features/flashcards/ReviewPage.tsx`     |
+| Quiz                                                  | Multiple-choice quiz                       | works (multiple choice from the deck, score)                 | 7      | `src/features/flashcards/QuizPage.tsx`       |
+| Empty deck state                                      | "Empty deck — add a card to begin."        | works                                                        | 7      | `src/features/flashcards/FlashcardsPage.tsx` |
+| Card create / edit / delete, CSV export               | Per §5                                     | works for create/edit/delete; CSV export in Module 9         | 7, 9   | `src/features/flashcards/DeckPage.tsx`       |
 
 ## Library (`library-desktop-light.png`)
 
@@ -78,14 +78,14 @@ Status: works / broken / UI-only / missing / disabled (Coming soon). "Module" re
 
 ## Reader split view (`reader-split-desktop-light.png`)
 
-| Element             | Expected behavior                                          | Status                                                                              | Module  | Target file                                |
-| ------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------- | ------------------------------------------ |
-| Back                | Return                                                     | works                                                                               | 6       | `src/features/reader/ReaderPage.tsx`       |
-| Page X of Y         | Reading position, saved progress                           | works (position saved and restored)                                                 | 6       | `src/features/reader/ReaderPage.tsx`       |
-| Text selection menu | Highlight, Create flashcard, Explain, Summarize, Translate | works for Highlight; Create flashcard (Module 7) and AI actions (Module 8) disabled | 6, 8    | `src/features/reader/SelectionPopover.tsx` |
-| Highlights          | Saved and restored                                         | works (saved, restored after reload, removable)                                     | 6       | `src/features/reader/highlightDom.ts`      |
-| Divider             | Resize panes; tabs Book / Notes on mobile                  | works (drag or arrow keys; Book / Notes tabs on mobile)                             | 6       | `src/features/reader/ReaderPage.tsx`       |
-| Notes pane          | Handwritten/typed notes linked to the book                 | works (embedded whiteboard of the linked notebook)                                  | 4, 5, 6 | `src/features/reader/ReaderPage.tsx`       |
+| Element             | Expected behavior                                          | Status                                                                   | Module  | Target file                                |
+| ------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------ | ------- | ------------------------------------------ |
+| Back                | Return                                                     | works                                                                    | 6       | `src/features/reader/ReaderPage.tsx`       |
+| Page X of Y         | Reading position, saved progress                           | works (position saved and restored)                                      | 6       | `src/features/reader/ReaderPage.tsx`       |
+| Text selection menu | Highlight, Create flashcard, Explain, Summarize, Translate | works for Highlight and Create flashcard; AI actions (Module 8) disabled | 6, 8    | `src/features/reader/SelectionPopover.tsx` |
+| Highlights          | Saved and restored                                         | works (saved, restored after reload, removable)                          | 6       | `src/features/reader/highlightDom.ts`      |
+| Divider             | Resize panes; tabs Book / Notes on mobile                  | works (drag or arrow keys; Book / Notes tabs on mobile)                  | 6       | `src/features/reader/ReaderPage.tsx`       |
+| Notes pane          | Handwritten/typed notes linked to the book                 | works (embedded whiteboard of the linked notebook)                       | 4, 5, 6 | `src/features/reader/ReaderPage.tsx`       |
 
 ## Settings (`settings-desktop-light.png`)
 
