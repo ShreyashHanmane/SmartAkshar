@@ -80,7 +80,7 @@ Status: works / broken / UI-only / missing / disabled (Coming soon). "Module" re
 
 | Element             | Expected behavior                                          | Status                                                                              | Module  | Target file                                |
 | ------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------- | ------------------------------------------ |
-| Back                | Return                                                     | works                                                                               | 6       | `src/features/whiteboard/Bars.tsx`         |
+| Back                | Return                                                     | works                                                                               | 6       | `src/features/reader/ReaderPage.tsx`       |
 | Page X of Y         | Reading position, saved progress                           | works (position saved and restored)                                                 | 6       | `src/features/reader/ReaderPage.tsx`       |
 | Text selection menu | Highlight, Create flashcard, Explain, Summarize, Translate | works for Highlight; Create flashcard (Module 7) and AI actions (Module 8) disabled | 6, 8    | `src/features/reader/SelectionPopover.tsx` |
 | Highlights          | Saved and restored                                         | works (saved, restored after reload, removable)                                     | 6       | `src/features/reader/highlightDom.ts`      |
