@@ -5,6 +5,9 @@ export interface MenuItem {
   label: string;
   icon?: IconName;
   danger?: boolean;
+  /** Shown but not actionable (e.g. "Coming soon"); `hint` becomes the tooltip. */
+  disabled?: boolean;
+  hint?: string;
   onSelect: () => void;
 }
 
@@ -92,11 +95,14 @@ export function Menu({ label, items, trigger, align = 'end', triggerClassName = 
               type="button"
               role="menuitem"
               tabIndex={-1}
+              aria-disabled={item.disabled || undefined}
+              title={item.hint}
               onClick={() => {
+                if (item.disabled) return;
                 close(false);
                 item.onSelect();
               }}
-              className={`flex min-h-11 w-full items-center gap-2 px-3 text-left text-sm hover:bg-primary-soft focus:bg-primary-soft ${item.danger ? 'text-danger' : 'text-ink'}`}
+              className={`flex min-h-11 w-full items-center gap-2 px-3 text-left text-sm hover:bg-primary-soft focus:bg-primary-soft ${item.danger ? 'text-danger' : 'text-ink'} ${item.disabled ? 'cursor-not-allowed opacity-60' : ''}`}
             >
               {item.icon && <Icon name={item.icon} size={18} />}
               {item.label}

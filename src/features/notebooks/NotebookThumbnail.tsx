@@ -6,7 +6,7 @@ import { useLive } from '../../data/useLive';
 import { Icon } from '../../ui/Icon';
 import { SUBJECT_CLASSES } from '../subjects/subjectColors';
 import { type Element, PAGE_WIDTH, unionBounds } from '../whiteboard/model';
-import { drawElements, drawPaper, fitView } from '../whiteboard/render';
+import { drawElements, drawPaper, ensureFonts, fitView } from '../whiteboard/render';
 
 function useVisible(ref: React.RefObject<HTMLDivElement | null>) {
   const [visible, setVisible] = useState(false);
@@ -38,6 +38,17 @@ export function NotebookThumbnail({ notebook, color }: { notebook: Notebook; col
   const empty = page.status === 'ready' && elements.length === 0;
 
   const [size, setSize] = useState({ width: 0, height: 0 });
+  const [fontsReady, setFontsReady] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    void ensureFonts(elements).then((loaded) => {
+      if (loaded && !cancelled) setFontsReady((n) => n + 1);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [elements]);
 
   // Redraw when the card is laid out or resized (a 0-width first measure draws nothing).
   useEffect(() => {
@@ -88,7 +99,7 @@ export function NotebookThumbnail({ notebook, color }: { notebook: Notebook; col
       );
       drawElements(ctx, elements, view);
     }
-  }, [elements, notebook.mode, notebook.paper, notebook.background, page.status, size]);
+  }, [elements, notebook.mode, notebook.paper, notebook.background, page.status, size, fontsReady]);
 
   const soft = color ? SUBJECT_CLASSES[color].soft : 'bg-surface-sunken';
   const text = color ? SUBJECT_CLASSES[color].text : 'text-ink-muted';

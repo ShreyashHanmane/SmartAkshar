@@ -206,3 +206,16 @@ export function fitView(
     offsetY: (canvasHeight - rect.height * scale) / 2 - rect.y * scale,
   };
 }
+
+/** Loads the web fonts used by text elements so canvas text never renders in a fallback font. */
+export async function ensureFonts(elements: Element[]): Promise<boolean> {
+  if (typeof document === 'undefined' || !('fonts' in document)) return false;
+  const needed = new Set(
+    elements.flatMap((el) => (el.kind === 'text' && el.font !== 'sans' ? [el.font] : [])),
+  );
+  if (needed.size === 0) return false;
+  const missing = [...needed].filter((f) => !document.fonts.check(`16px ${FONT_FAMILY[f]}`));
+  if (missing.length === 0) return false;
+  await Promise.all(missing.map((f) => document.fonts.load(`16px ${FONT_FAMILY[f]}`)));
+  return true;
+}
