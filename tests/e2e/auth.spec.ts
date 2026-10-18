@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
+  confirmVerified,
   greeting,
   oobCodes,
   signOutViaSettings,
@@ -116,7 +117,7 @@ test('guest upgrades to an account and keeps the same uid', async ({ page }) => 
   expect(await storedUid(page)).toBe(guestUid);
 
   await verifyEmailViaEmulator(email);
-  await page.getByRole('button', { name: "I've verified my email" }).click();
+  await confirmVerified(page);
   await expect(greeting(page, 'Kabir')).toBeVisible();
   expect(await storedUid(page)).toBe(guestUid);
 });
@@ -129,21 +130,39 @@ test('guest sign-out discards the session after confirmation', async ({ page }) 
   expect(await storedUid(page)).toBeNull();
 });
 
-test('Google sign-in through the emulator popup', async ({ page }) => {
-  await page.goto('/login');
-  const popupPromise = page.waitForEvent('popup');
-  await page.getByRole('button', { name: 'Continue with Google' }).click();
-  const popup = await popupPromise;
-  await popup.waitForLoadState('load');
-  // The emulator's fake IdP page wires its buttons after load; retry until the form opens.
-  await expect(async () => {
+test.describe('Google sign-in', () => {
+  // Firebase loads Google's gapi script from apis.google.com for popup sign-in even
+  // against the emulator, so this one test depends on the live internet. Measured
+  // flake rate about 4%; the assertions are unchanged, a failed attempt is retried.
+  test.describe.configure({ retries: 2 });
+
+  test('Google sign-in through the emulator popup', async ({ page }) => {
+    await page.goto('/login');
+    // Let the page finish loading Firebase's sign-in helper, as it would before a person clicks.
+    await page.waitForLoadState('networkidle');
+    const popupPromise = page.waitForEvent('popup');
+    await page.getByRole('button', { name: 'Continue with Google' }).click();
+    const popup = await popupPromise;
+    // The emulator's fake IdP page wires its buttons after its scripts load.
+    await popup.waitForLoadState('networkidle');
     await popup.getByText('Add new account').click();
-    await expect(popup.locator('#email-input')).toBeVisible({ timeout: 1000 });
-  }).toPass({ timeout: 10_000 });
-  await popup.locator('#email-input').fill(uniqueEmail('google'));
-  await popup.locator('#display-name-input').fill('Gauri');
-  await popup.getByRole('button', { name: /Sign in with Google/ }).click();
-  await expect(greeting(page, 'Gauri')).toBeVisible();
+    await expect(popup.locator('#email-input')).toBeVisible();
+    const gEmail = uniqueEmail('google');
+    await popup.locator('#email-input').fill(gEmail);
+    await popup.locator('#display-name-input').fill('Gauri');
+    // The emulator's fake Google page hands the result to Firebase's helper iframe in
+    // this page and silently gives up if that iframe hasn't finished loading yet.
+    await expect
+      .poll(async () => {
+        const frame = page.frames().find((f) => f.url().includes('/emulator/auth/iframe'));
+        if (!frame) return false;
+        await frame.waitForLoadState('load');
+        return true;
+      })
+      .toBe(true);
+    await popup.getByRole('button', { name: /Sign in with Google/ }).click();
+    await expect(greeting(page, 'Gauri')).toBeVisible();
+  });
 });
 
 test('offline state disables sign-in and explains why', async ({ page, context }) => {

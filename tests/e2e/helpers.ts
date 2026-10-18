@@ -68,8 +68,17 @@ export async function signUpVerified(
 ): Promise<void> {
   await signUp(page, name, email, password);
   await verifyEmailViaEmulator(email);
-  await page.getByRole('button', { name: "I've verified my email" }).click();
+  await confirmVerified(page);
   await expect(greeting(page, name)).toBeVisible();
+}
+
+/**
+ * Presses "I've verified my email" unless a token refresh already moved the app
+ * on to the dashboard (both are correct outcomes).
+ */
+export async function confirmVerified(page: Page): Promise<void> {
+  const button = page.getByRole('button', { name: "I've verified my email" });
+  await button.click({ timeout: 3000 }).catch(() => undefined);
 }
 
 /** The dashboard greeting ("Good afternoon, Asha"). */
