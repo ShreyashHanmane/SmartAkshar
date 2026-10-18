@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import {
   oobCodes,
+  signOutViaSettings,
   signIn,
   signUp,
   signUpVerified,
@@ -36,8 +37,7 @@ test('sign up, verify email, sign out, and sign back in', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Signed in as Asha' })).toBeVisible();
 
   await page.evaluate(() => localStorage.setItem('akshar:test', 'cached'));
-  await page.getByRole('button', { name: 'Sign out' }).click();
-  await expect(page).toHaveURL(/\/login$/);
+  await signOutViaSettings(page);
   expect(await page.evaluate(() => localStorage.getItem('akshar:test'))).toBeNull();
   expect(await storedUid(page)).toBeNull();
 
@@ -48,8 +48,7 @@ test('sign up, verify email, sign out, and sign back in', async ({ page }) => {
 test('wrong credentials show one generic error', async ({ page }) => {
   const email = uniqueEmail('wrong');
   await signUpVerified(page, 'Ravi', email, PASSWORD);
-  await page.getByRole('button', { name: 'Sign out' }).click();
-  await expect(page).toHaveURL(/\/login$/);
+  await signOutViaSettings(page);
 
   await signIn(page, email, 'not-the-password1');
   await expect(page.getByRole('alert')).toHaveText('Email or password is incorrect.');
@@ -71,8 +70,7 @@ test('form validation shows inline errors', async ({ page }) => {
 test('forgot password sends a reset email without revealing accounts', async ({ page }) => {
   const email = uniqueEmail('reset');
   await signUpVerified(page, 'Meera', email, PASSWORD);
-  await page.getByRole('button', { name: 'Sign out' }).click();
-  await expect(page).toHaveURL(/\/login$/);
+  await signOutViaSettings(page);
 
   await page.goto('/login');
   await page.getByRole('link', { name: 'Forgot password?' }).click();
@@ -100,7 +98,8 @@ test('guest upgrades to an account and keeps the same uid', async ({ page }) => 
   expect(guestUid).toBeTruthy();
 
   // Signing out as a guest asks first.
-  await page.getByRole('button', { name: 'Sign out' }).click();
+  await page.goto('/settings');
+  await page.getByRole('main').getByRole('button', { name: 'Sign out' }).click();
   const dialog = page.getByRole('dialog', { name: 'Sign out of guest session?' });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Create account instead' }).click();
@@ -125,9 +124,7 @@ test('guest sign-out discards the session after confirmation', async ({ page }) 
   await page.goto('/login');
   await page.getByRole('button', { name: 'Continue as guest' }).click();
   await expect(page.getByRole('heading', { name: 'Signed in as Guest' })).toBeVisible();
-  await page.getByRole('button', { name: 'Sign out' }).click();
-  await page.getByRole('button', { name: 'Sign out and discard' }).click();
-  await expect(page).toHaveURL(/\/login$/);
+  await signOutViaSettings(page, { guest: true });
   expect(await storedUid(page)).toBeNull();
 });
 

@@ -78,3 +78,30 @@ export async function signIn(page: Page, email: string, password: string): Promi
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
+
+export async function signInAsGuest(page: Page): Promise<void> {
+  await page.goto('/login');
+  await page.getByRole('button', { name: 'Continue as guest' }).click();
+  await expect(page).toHaveURL(/\/$/);
+}
+
+export function isMobile(page: Page): boolean {
+  return (page.viewportSize()?.width ?? 1024) < 768;
+}
+
+/** Opens the navigation (the drawer on mobile; the sidebar is always visible on larger screens). */
+export async function openNav(page: Page): Promise<void> {
+  if (isMobile(page)) await page.getByRole('button', { name: 'Open menu' }).click();
+}
+
+export function nav(page: Page) {
+  return isMobile(page) ? page.getByRole('dialog', { name: 'Main navigation' }) : page.locator('aside');
+}
+
+/** Sign-out lives in Settings. Guests are asked to confirm. */
+export async function signOutViaSettings(page: Page, { guest = false } = {}): Promise<void> {
+  await page.goto('/settings');
+  await page.getByRole('main').getByRole('button', { name: 'Sign out' }).click();
+  if (guest) await page.getByRole('button', { name: 'Sign out and discard' }).click();
+  await expect(page).toHaveURL(/\/login$/);
+}
