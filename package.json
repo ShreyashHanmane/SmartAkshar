@@ -14,7 +14,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "PLAYWRIGHT_BROWSERS_PATH=0 playwright test",
+    "test:e2e": "XDG_CONFIG_HOME=./.config-local FIREBASE_EMULATORS_PATH=./.emulators PLAYWRIGHT_BROWSERS_PATH=0 firebase emulators:exec --only auth,firestore,storage --project demo-akshar \"playwright test\"",
     "test:e2e:install": "PLAYWRIGHT_BROWSERS_PATH=0 playwright install chromium",
     "test:rules": "XDG_CONFIG_HOME=./.config-local FIREBASE_EMULATORS_PATH=./.emulators firebase emulators:exec --only firestore,storage --project demo-akshar \"vitest run --config vitest.rules.config.ts\"",
     "emulators": "XDG_CONFIG_HOME=./.config-local FIREBASE_EMULATORS_PATH=./.emulators firebase emulators:start --project demo-akshar",

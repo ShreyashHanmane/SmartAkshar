@@ -42,7 +42,8 @@ test('unknown routes show the not-found page with a way back', async ({ page }) 
   await page.goto('/does-not-exist');
   await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
   await page.getByRole('link', { name: 'Go to the start page' }).click();
-  await expect(page).toHaveURL('/');
+  // The start page is protected, so a signed-out visitor lands on sign-in.
+  await expect(page).toHaveURL(/\/login\?next=%2F$/);
 });
 
 test('layout has no horizontal overflow', async ({ page }) => {

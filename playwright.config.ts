@@ -19,9 +19,10 @@ export default defineConfig({
     { name: 'mobile', use: { ...devices['Pixel 7'] } },
   ],
   webServer: {
-    command: `npm run build && npx vite preview --port ${PORT} --strictPort`,
+    // Production build wired to the local emulators (demo project, never real Firebase).
+    command: `VITE_USE_EMULATORS=true npm run build && npx vite preview --port ${PORT} --strictPort`,
     port: PORT,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 });
