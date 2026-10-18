@@ -136,9 +136,8 @@ test('deleting the notebook removes its notes and images', async ({ page }) => {
   const src = (await editor(page).locator('img').getAttribute('src')) ?? '';
 
   await page.getByRole('button', { name: 'More options' }).click();
-  await expect(page.getByRole('menuitem', { name: 'Export Word (DOCX)' })).toHaveAttribute(
+  await expect(page.getByRole('menuitem', { name: 'Export Word (DOCX)' })).not.toHaveAttribute(
     'aria-disabled',
-    'true',
   );
   await page.getByRole('menuitem', { name: 'Delete' }).click();
   await page

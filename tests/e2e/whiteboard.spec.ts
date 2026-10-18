@@ -258,7 +258,7 @@ test('toolbar docks, collapses, and remembers its position', async ({ page }) =>
 
 test('rename, focus mode, and delete from the menu', async ({ page }) => {
   await page.getByRole('button', { name: 'More options' }).click();
-  await expect(page.getByRole('menuitem', { name: 'Export PDF' })).toHaveAttribute('aria-disabled', 'true');
+  await expect(page.getByRole('menuitem', { name: 'Export PDF' })).not.toHaveAttribute('aria-disabled');
   await page.getByRole('menuitem', { name: 'Rename' }).click();
   await page.getByRole('dialog', { name: 'Rename notebook' }).getByLabel('Title').fill('Laws of Motion');
   await page.getByRole('button', { name: 'Save' }).click();

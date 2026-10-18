@@ -487,5 +487,10 @@
   "export.thisPage": "This page ({n})",
   "export.allPages": "All pages ({count})",
   "export.notesPdfHint": "Your typed notes as an A4 PDF, including images.",
-  "export.csv": "Export CSV"
+  "export.csv": "Export CSV",
+  "settings.data": "Data",
+  "settings.exportAllTitle": "Export all my data",
+  "settings.exportAllHint": "A ZIP file with your notebooks, notes, books, highlights, flashcards and settings.",
+  "settings.exportAll": "Export ZIP",
+  "settings.exportAllProgress": "Preparing… {mb} MB"
 }

@@ -275,3 +275,24 @@
 **Tests:** 7 server AI tests (fake provider: auth, quota and refund, size limits, fenced prompts, card parsing, timeouts), prompt unit tests, a starter-content API test, and new e2e scenarios in `tests/e2e/ai.spec.ts` against a second test-only server with a scripted AI (no network). Full e2e suite: 192 passed, 3 skipped by design (mobile duplicates of selection flows).
 
 **Remember:** set a budget alert in Google AI Studio / Cloud for the Gemini key.
+
+## Module 9: Export (branch `feat/export`)
+
+**Status:** complete. No new dependencies: the PDF, DOCX and ZIP writers are hand-written (`src/features/export/`, `src/shared/zip.ts`).
+
+**Done**
+
+- **Whiteboard:** "..." → Export PDF lets you choose this page or all pages, with a progress bar and Cancel. Paged notebooks export as A4 pages. Infinite mode exports the drawing's bounds. "Export image" saves a PNG of the current page at 2000 × 2828.
+- **Notes:** Export PDF (A4, laid out with the app's fonts, so every script renders) and Export Word (DOCX: headings, marks, links, nested lists, quotes, code, dividers, images). Both use the editor's current content, so text typed just before exporting is included.
+- **Flashcards:** deck menu → Export CSV (front, back, deck, box, due). Formula injection is neutralized, and there's a BOM so Excel reads UTF-8.
+- **Full data export:** Settings → Data → Export ZIP. The server streams a ZIP of `data.json` (all of the user's data; never password hashes or sessions), their books and note images, and a README. Progress shows MB downloaded, with Cancel.
+- File names are sanitized; ZIP entry names can't escape the archive.
+
+**Decisions**
+
+- PDFs are made of lossless page images (Flate RGB) rather than vector text. The output looks exactly like the app in every script, without embedding fonts. The trade-off is that PDF text isn't selectable or searchable; DOCX is the editable format.
+- The Settings "Data" card was started here for the ZIP export; the rest of Settings is Module 10.
+
+**Verification beyond the tests:** sample PDFs pass `qpdf --check`; LibreOffice opened the DOCX and converted it to PDF, which rendered correctly; Python's `zipfile` read the ZIPs with no errors.
+
+**Tests:** unit tests for ZIP (CRC, round trip, path safety), PDF (opened with pdf.js: page count, sizes, title), DOCX (package parts, numbering, links, image scaling), notes layout (wrapping, margins, pagination) and CSV (injection, quoting). Server tests for the export cover contents, no secrets, owner-only and session required. E2E (`tests/e2e/export.spec.ts`) downloads each file and opens it: PDF page count and size, PNG pixels, DOCX text, CSV text, ZIP `data.json`. Full e2e suite: 204 passed, 3 skipped by design.

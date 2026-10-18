@@ -61,6 +61,12 @@ data/            Local database (akshar.db) and uploaded files — gitignored, c
 - **Handwriting:** only the selected strokes are rendered to a PNG and sent; the panel says what is sent.
 - **Logs:** metadata only (hashed user id, action, status, duration).
 
+## Export
+
+- **In the browser** (`src/features/export/`): whiteboard pages and notes are rendered to a canvas and written into a PDF as lossless page images (`pdf.ts`); notes also go to DOCX (`docx.ts`); decks go to CSV (`csv.ts`). Everything is built from the editor's in-memory content.
+- **On the server** (`server/export.ts`, `GET /api/export`): a streamed ZIP with `data.json`, the user's files and a README. It's owner-only and contains no credentials.
+- `src/shared/zip.ts` is a small ZIP writer and reader (CompressionStream), shared by both.
+
 ## Starter content
 
 New accounts get 4 subjects (Physics, Mathematics, Chemistry, History) and 4 decks with sample cards (`server/starter.ts`), inserted in the same transaction as the account. They're ordinary data that the user can edit or delete.

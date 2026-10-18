@@ -5,6 +5,7 @@ import { t } from '../../i18n/i18n';
 import { Button } from '../../ui/Button';
 import { Segmented } from '../../ui/Segmented';
 import { useSignOut } from '../auth/useSignOut';
+import { ExportAllButton } from './ExportAllButton';
 
 function Row({ title, description, control }: { title: string; description?: string; control: ReactNode }) {
   return (
@@ -117,6 +118,14 @@ export function SettingsPage() {
               {t('auth.signOut')}
             </Button>
           }
+        />
+      </Card>
+
+      <Card title={t('settings.data')}>
+        <Row
+          title={t('settings.exportAllTitle')}
+          description={t('settings.exportAllHint')}
+          control={<ExportAllButton />}
         />
       </Card>
       {signOut.dialog}

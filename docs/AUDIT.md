@@ -24,7 +24,7 @@ Status: works / broken / UI-only / missing / disabled (Coming soon). "Module" re
 | Element                     | Expected behavior                                             | Status                                                                  | Module | Target file                                  |
 | --------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------- | ------ | -------------------------------------------- |
 | Search field                | Global search over notebooks, PDFs, flashcards                | works (subjects now; notebooks, books, decks as their modules add them) | 2      | `src/features/search/SearchBox.tsx`          |
-| Ask AI                      | Opens the AI panel (server-side AI)                           | works (panel explains how to turn AI on if off)                        | 8      | `src/features/dashboard/DashboardPage.tsx`   |
+| Ask AI                      | Opens the AI panel (server-side AI)                           | works (panel explains how to turn AI on if off)                         | 8      | `src/features/dashboard/DashboardPage.tsx`   |
 | Greeting + date + name      | Time-of-day greeting, localized date, user name               | works                                                                   | 3      | `src/features/dashboard/DashboardPage.tsx`   |
 | This week: hours focused    | From real tracked usage                                       | works (real tracked study time)                                         | 3      | `src/features/dashboard/stats.ts`            |
 | Flashcards due + Review now | Real due count; starts review                                 | works (real due count; review screen in Module 7)                       | 3, 7   | `src/features/dashboard/DashboardPage.tsx`   |
@@ -36,23 +36,23 @@ Status: works / broken / UI-only / missing / disabled (Coming soon). "Module" re
 
 ## Whiteboard (`whiteboard-desktop-light.png`)
 
-| Element                                         | Expected behavior                                                   | Status                                                                         | Module | Target file                                    |
-| ----------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------ | ---------------------------------------------- |
-| Back                                            | Return to previous screen                                           | works                                                                          | 4      | `src/features/whiteboard/Bars.tsx`             |
-| Subject + title                                 | Show; rename via "..." menu                                         | works (rename via "..." menu)                                                  | 4      | `src/features/whiteboard/Bars.tsx`             |
-| Saved chip                                      | Saving / Saved / Offline / Error                                    | works (Saving / Saved / Offline / Error + Retry)                               | 4      | `src/features/whiteboard/Bars.tsx`             |
-| Paged / Infinite switch, AI sparkle, "..." menu | Per §5 (hidden under notification in capture)                       | works (switch keeps all content; sparkle opens the AI panel; Export disabled until Module 9) | 4, 8   | `src/features/whiteboard/WhiteboardPage.tsx`   |
-| Toolbar drag handle                             | Drag; dock left/right/bottom; collapse; remembered                  | works (drag or arrow keys; dock left/right/bottom; collapse; remembered)       | 4      | `src/features/whiteboard/Toolbar.tsx`          |
-| Lasso                                           | Circle-select; Move / Erase / Convert to text / Explain / Translate | works (select, Move, Erase, Convert to text, Explain, Translate)              | 4, 8   | `src/features/whiteboard/WhiteboardCanvas.tsx` |
-| Pen, Highlighter, Eraser, Shapes, Text          | Real tools; text font picker (sans / serif / handwriting)           | works                                                                          | 4      | `src/features/whiteboard/WhiteboardCanvas.tsx` |
-| 5 color swatches                                | Set stroke color                                                    | works                                                                          | 4      | `src/features/whiteboard/Toolbar.tsx`          |
-| Palette button                                  | Paper style + background, saved per notebook                        | works (paper style + background, saved per notebook)                           | 4      | `src/features/whiteboard/Toolbar.tsx`          |
-| Undo / Redo                                     | History                                                             | works (buttons and Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y)                             | 4      | `src/features/whiteboard/editorStore.ts`       |
-| Size slider                                     | Pen thickness / highlighter opacity                                 | works (pen width, highlighter opacity, text size)                              | 4      | `src/features/whiteboard/Toolbar.tsx`          |
-| Dotted paper                                    | Paper style; fixed logical coordinates, scaled to fit               | works                                                                          | 4      | `src/features/whiteboard/render.ts`            |
-| Prev / next page, Page X of Y                   | Navigate pages                                                      | works                                                                          | 4      | `src/features/whiteboard/Bars.tsx`             |
-| Add page                                        | Append page                                                         | works                                                                          | 4      | `src/features/whiteboard/Bars.tsx`             |
-| Zoom −, %, +                                    | Zoom                                                                | works (% resets to fit; pinch and Ctrl+wheel too)                              | 4      | `src/features/whiteboard/Bars.tsx`             |
+| Element                                         | Expected behavior                                                   | Status                                                                                          | Module | Target file                                    |
+| ----------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------ | ---------------------------------------------- |
+| Back                                            | Return to previous screen                                           | works                                                                                           | 4      | `src/features/whiteboard/Bars.tsx`             |
+| Subject + title                                 | Show; rename via "..." menu                                         | works (rename via "..." menu)                                                                   | 4      | `src/features/whiteboard/Bars.tsx`             |
+| Saved chip                                      | Saving / Saved / Offline / Error                                    | works (Saving / Saved / Offline / Error + Retry)                                                | 4      | `src/features/whiteboard/Bars.tsx`             |
+| Paged / Infinite switch, AI sparkle, "..." menu | Per §5 (hidden under notification in capture)                       | works (switch keeps all content; sparkle opens the AI panel; Export PDF this/all pages and PNG) | 4, 8   | `src/features/whiteboard/WhiteboardPage.tsx`   |
+| Toolbar drag handle                             | Drag; dock left/right/bottom; collapse; remembered                  | works (drag or arrow keys; dock left/right/bottom; collapse; remembered)                        | 4      | `src/features/whiteboard/Toolbar.tsx`          |
+| Lasso                                           | Circle-select; Move / Erase / Convert to text / Explain / Translate | works (select, Move, Erase, Convert to text, Explain, Translate)                                | 4, 8   | `src/features/whiteboard/WhiteboardCanvas.tsx` |
+| Pen, Highlighter, Eraser, Shapes, Text          | Real tools; text font picker (sans / serif / handwriting)           | works                                                                                           | 4      | `src/features/whiteboard/WhiteboardCanvas.tsx` |
+| 5 color swatches                                | Set stroke color                                                    | works                                                                                           | 4      | `src/features/whiteboard/Toolbar.tsx`          |
+| Palette button                                  | Paper style + background, saved per notebook                        | works (paper style + background, saved per notebook)                                            | 4      | `src/features/whiteboard/Toolbar.tsx`          |
+| Undo / Redo                                     | History                                                             | works (buttons and Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y)                                              | 4      | `src/features/whiteboard/editorStore.ts`       |
+| Size slider                                     | Pen thickness / highlighter opacity                                 | works (pen width, highlighter opacity, text size)                                               | 4      | `src/features/whiteboard/Toolbar.tsx`          |
+| Dotted paper                                    | Paper style; fixed logical coordinates, scaled to fit               | works                                                                                           | 4      | `src/features/whiteboard/render.ts`            |
+| Prev / next page, Page X of Y                   | Navigate pages                                                      | works                                                                                           | 4      | `src/features/whiteboard/Bars.tsx`             |
+| Add page                                        | Append page                                                         | works                                                                                           | 4      | `src/features/whiteboard/Bars.tsx`             |
+| Zoom −, %, +                                    | Zoom                                                                | works (% resets to fit; pinch and Ctrl+wheel too)                                               | 4      | `src/features/whiteboard/Bars.tsx`             |
 
 ## Flashcards (`flashcards-desktop-light.png`)
 
@@ -64,7 +64,7 @@ Status: works / broken / UI-only / missing / disabled (Coming soon). "Module" re
 | Review                                                | Swipe review (know / don't know → Leitner) | works (flip, swipe, buttons, arrow keys; Leitner scheduling) | 7      | `src/features/flashcards/ReviewPage.tsx`     |
 | Quiz                                                  | Multiple-choice quiz                       | works (multiple choice from the deck, score)                 | 7      | `src/features/flashcards/QuizPage.tsx`       |
 | Empty deck state                                      | "Empty deck — add a card to begin."        | works                                                        | 7      | `src/features/flashcards/FlashcardsPage.tsx` |
-| Card create / edit / delete, CSV export               | Per §5                                     | works for create/edit/delete; CSV export in Module 9         | 7, 9   | `src/features/flashcards/DeckPage.tsx`       |
+| Card create / edit / delete, CSV export               | Per §5                                     | works (create/edit/delete; deck menu → Export CSV)           | 7, 9   | `src/features/flashcards/DeckPage.tsx`       |
 
 ## Library (`library-desktop-light.png`)
 
@@ -78,35 +78,35 @@ Status: works / broken / UI-only / missing / disabled (Coming soon). "Module" re
 
 ## Reader split view (`reader-split-desktop-light.png`)
 
-| Element             | Expected behavior                                          | Status                                                                   | Module  | Target file                                |
-| ------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------ | ------- | ------------------------------------------ |
-| Back                | Return                                                     | works                                                                    | 6       | `src/features/reader/ReaderPage.tsx`       |
-| Page X of Y         | Reading position, saved progress                           | works (position saved and restored)                                      | 6       | `src/features/reader/ReaderPage.tsx`       |
-| Text selection menu | Highlight, Create flashcard, Explain, Summarize, Translate | works (all five; AI actions via the local server)                       | 6, 8    | `src/features/reader/SelectionPopover.tsx` |
-| Highlights          | Saved and restored                                         | works (saved, restored after reload, removable)                          | 6       | `src/features/reader/highlightDom.ts`      |
-| Divider             | Resize panes; tabs Book / Notes on mobile                  | works (drag or arrow keys; Book / Notes tabs on mobile)                  | 6       | `src/features/reader/ReaderPage.tsx`       |
-| Notes pane          | Handwritten/typed notes linked to the book                 | works (embedded whiteboard of the linked notebook)                       | 4, 5, 6 | `src/features/reader/ReaderPage.tsx`       |
+| Element             | Expected behavior                                          | Status                                                  | Module  | Target file                                |
+| ------------------- | ---------------------------------------------------------- | ------------------------------------------------------- | ------- | ------------------------------------------ |
+| Back                | Return                                                     | works                                                   | 6       | `src/features/reader/ReaderPage.tsx`       |
+| Page X of Y         | Reading position, saved progress                           | works (position saved and restored)                     | 6       | `src/features/reader/ReaderPage.tsx`       |
+| Text selection menu | Highlight, Create flashcard, Explain, Summarize, Translate | works (all five; AI actions via the local server)       | 6, 8    | `src/features/reader/SelectionPopover.tsx` |
+| Highlights          | Saved and restored                                         | works (saved, restored after reload, removable)         | 6       | `src/features/reader/highlightDom.ts`      |
+| Divider             | Resize panes; tabs Book / Notes on mobile                  | works (drag or arrow keys; Book / Notes tabs on mobile) | 6       | `src/features/reader/ReaderPage.tsx`       |
+| Notes pane          | Handwritten/typed notes linked to the book                 | works (embedded whiteboard of the linked notebook)      | 4, 5, 6 | `src/features/reader/ReaderPage.tsx`       |
 
 ## Settings (`settings-desktop-light.png`)
 
-| Element                                                             | Expected behavior                            | Status                                                                         | Module | Target file                              |
-| ------------------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------ | ------ | ---------------------------------------- |
-| Theme Light / Dark / Paper                                          | Applies instantly; saved per user            | works (saved per user)                                                         | 2, 10  | `src/features/settings/SettingsPage.tsx` |
-| Text size S / M / L                                                 | Scales interface text; saved                 | works (saved per user)                                                         | 2, 10  | `src/features/settings/SettingsPage.tsx` |
-| Interface language                                                  | Switch locale; saved                         | works (English is the only language for now)                                   | 2, 10  | `src/features/settings/SettingsPage.tsx` |
-| Whiteboard toolbar side Left / Right                                | Default toolbar dock side                    | works (saved; used by the whiteboard in Module 4)                              | 10     | `src/features/settings/SettingsPage.tsx` |
-| Change photo                                                        | Upload profile photo                         | missing                                                                        | 10     | same                                     |
-| Name, Email                                                         | Edit profile; email change with verification | missing                                                                        | 10     | same                                     |
-| Change password                                                     | Re-auth + change                             | missing                                                                        | 10     | same                                     |
-| Sign out                                                            | Sign out, clear cached data                  | works (Module 1; on the temporary home page, moves into Settings in Module 10) | 1      | `src/features/auth/useSignOut.tsx`       |
-| (below fold) Delete account, Data export, sync status, storage used | Per §5                                       | missing                                                                        | 10     | same                                     |
+| Element                                                             | Expected behavior                            | Status                                                                             | Module | Target file                              |
+| ------------------------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------- | ------ | ---------------------------------------- |
+| Theme Light / Dark / Paper                                          | Applies instantly; saved per user            | works (saved per user)                                                             | 2, 10  | `src/features/settings/SettingsPage.tsx` |
+| Text size S / M / L                                                 | Scales interface text; saved                 | works (saved per user)                                                             | 2, 10  | `src/features/settings/SettingsPage.tsx` |
+| Interface language                                                  | Switch locale; saved                         | works (English is the only language for now)                                       | 2, 10  | `src/features/settings/SettingsPage.tsx` |
+| Whiteboard toolbar side Left / Right                                | Default toolbar dock side                    | works (saved; used by the whiteboard in Module 4)                                  | 10     | `src/features/settings/SettingsPage.tsx` |
+| Change photo                                                        | Upload profile photo                         | missing                                                                            | 10     | same                                     |
+| Name, Email                                                         | Edit profile; email change with verification | missing                                                                            | 10     | same                                     |
+| Change password                                                     | Re-auth + change                             | missing                                                                            | 10     | same                                     |
+| Sign out                                                            | Sign out, clear cached data                  | works (Module 1; on the temporary home page, moves into Settings in Module 10)     | 1      | `src/features/auth/useSignOut.tsx`       |
+| (below fold) Delete account, Data export, sync status, storage used | Per §5                                       | Data export works (Settings → Data → Export ZIP); the rest missing until Module 10 | 10     | same                                     |
 
 ## Not in captures but required by CLAUDE.md
 
 - **Auth screens: works.** Local accounts: sign up (name, username, password), login, sign-out, protected routes, session persistence, "Forgot password?" with the local reset command, and a server-unreachable screen. Google sign-in, guest mode and email verification were removed by the local-only decision (2026-10-18).
 - **Notes editor:** Tiptap.
 - **AI side panel / bottom sheet: works.** Summarize, explain, translate, flashcards from text, handwriting to text; cancel, errors, daily usage, copy / insert into notes / save as flashcards. Reader header: summarize this page or the whole book.
-- **Exports:** whiteboard PDF/PNG, notes PDF/DOCX, ZIP.
+- **Exports: works.** Whiteboard PDF (this page / all pages) and PNG; notes PDF and DOCX; deck CSV; full ZIP from Settings.
 - **Offline / PWA.**
 - **Missing states on every screen:** empty, loading (skeleton), error, offline, save confirmations and toasts.
 

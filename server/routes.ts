@@ -50,6 +50,7 @@ import {
 } from './auth.ts';
 import { type Db, tx } from './db.ts';
 import { addStarterContent } from './starter.ts';
+import { streamExport } from './export.ts';
 import type { EventHub } from './events.ts';
 import { HttpError, noContent, readJson, sendJson, streamToFile } from './http.ts';
 import { RateLimiter } from './security.ts';
@@ -988,4 +989,12 @@ route('DELETE', '/api/books/:id/highlights/:hid', (ctx) => {
  */
 route('GET', '/api/events', (ctx) => {
   ctx.hub.add(sessionUser(ctx.db, ctx.req) ?? '', ctx.res);
+});
+
+// --- export ------------------------------------------------------------------
+
+/** Everything the user created, as one ZIP (data.json + their files). */
+route('GET', '/api/export', async (ctx) => {
+  const uid = requireUser(ctx.db, ctx.req);
+  await streamExport(ctx.db, ctx.dataDir, uid, ctx.res);
 });
