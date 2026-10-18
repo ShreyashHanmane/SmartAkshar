@@ -84,6 +84,24 @@ describe('EditorStore', () => {
     vi.useRealTimers();
   });
 
+  it('keeps retrying while the server is unreachable, without ever failing', async () => {
+    let reachable = false;
+    const { store, saved, deps } = setup(() =>
+      reachable ? Promise.resolve() : Promise.reject(new Error('network')),
+    );
+    deps.isTransient = () => true;
+    store.setElements('p0', [el('a')]);
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+    for (let i = 0; i < 10; i++) await vi.advanceTimersByTimeAsync(3000);
+    expect(store.getSnapshot().failed).toBe(false);
+    expect(store.getSnapshot().dirty).toBeGreaterThan(0);
+    reachable = true;
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(store.getSnapshot().dirty + store.getSnapshot().inFlight).toBe(0);
+    expect(saved.at(-1)?.elements.map((e) => e.id)).toEqual(['a']);
+    vi.useRealTimers();
+  });
+
   it('undo and redo restore page states and save them', async () => {
     const { store, saved } = setup();
     store.setElements('p0', [el('a')]);

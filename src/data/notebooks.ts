@@ -1,161 +1,68 @@
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  limit as limitTo,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  updateDoc,
-  writeBatch,
-} from 'firebase/firestore';
 import { z } from 'zod';
 import type { Element } from '../features/whiteboard/model';
-import { PAPER_BACKGROUNDS, PAPER_STYLES } from '../features/whiteboard/paper';
+import { LIMITS, type Notebook, notebookSchema } from '../shared/schemas';
+import { ApiError, getJson, newId, send } from './api';
 import { parseElements } from './elements';
-import { deleteObject, listAll, ref as storageRef } from 'firebase/storage';
-import { getFirebase } from './firebase';
-import { LIMITS } from './models';
+import { live } from './events';
 
-export const notebookSchema = z.object({
-  title: z.string().min(1).max(LIMITS.title),
-  subjectId: z.string().max(64).nullable().catch(null),
-  mode: z.enum(['paged', 'infinite']).catch('paged'),
-  paper: z.enum(PAPER_STYLES).catch('dots'),
-  background: z
-    .enum(
-      Object.keys(PAPER_BACKGROUNDS) as [
-        keyof typeof PAPER_BACKGROUNDS,
-        ...(keyof typeof PAPER_BACKGROUNDS)[],
-      ],
-    )
-    .catch('white'),
-  pageCount: z.number().int().min(1).max(500).catch(1),
-  updatedAt: z
-    .custom<{ toMillis: () => number }>((v) => typeof v === 'object' && v !== null && 'toMillis' in v)
-    .nullable()
-    .catch(null),
-});
-
-export type NotebookData = z.infer<typeof notebookSchema>;
-export interface Notebook extends Omit<NotebookData, 'updatedAt'> {
-  id: string;
-  /** Milliseconds; null while a local write is waiting for the server timestamp. */
-  updatedAt: number | null;
-}
+export type { Notebook };
+const enc = encodeURIComponent;
 
 export function cleanTitle(title: string): string {
   return title.trim().replace(/\s+/g, ' ').slice(0, LIMITS.title);
 }
 
-function notebooksCol(uid: string) {
-  return collection(getFirebase().db, 'users', uid, 'notebooks');
-}
-
-function parseNotebook(id: string, data: unknown): Notebook | null {
-  const parsed = notebookSchema.safeParse(data);
-  if (!parsed.success) return null;
-  const { updatedAt, ...rest } = parsed.data;
-  return { ...rest, id, updatedAt: updatedAt ? updatedAt.toMillis() : null };
-}
-
 /** Notebooks, most recently edited first. */
-export function subscribeNotebooks(
-  uid: string,
-  next: (notebooks: Notebook[]) => void,
-  fail: (e: unknown) => void,
-  max = 200,
-) {
-  return onSnapshot(
-    query(notebooksCol(uid), orderBy('updatedAt', 'desc'), limitTo(max)),
-    { includeMetadataChanges: false },
-    (snap) =>
-      next(snap.docs.flatMap((d) => parseNotebook(d.id, d.data({ serverTimestamps: 'estimate' })) ?? [])),
+export function subscribeNotebooks(_uid: string, next: (n: Notebook[]) => void, fail: (e: unknown) => void) {
+  return live(() => getJson('/api/notebooks', z.array(notebookSchema)), ['notebooks'], next, fail);
+}
+
+export function subscribeNotebook(_uid: string, id: string, next: (n: Notebook | null) => void, fail: (e: unknown) => void) {
+  return live(
+    () =>
+      getJson(`/api/notebooks/${enc(id)}`, notebookSchema).catch((e: unknown) => {
+        if (e instanceof ApiError && e.status === 404) return null;
+        throw e;
+      }),
+    [`notebook:${id}`, 'notebooks'],
+    next,
     fail,
   );
 }
 
-export function subscribeNotebook(
-  uid: string,
+/** Creates a notebook (with its first empty page). The id is known right away. */
+export function createNotebook(_uid: string, input: { title: string; subjectId: string | null }): { id: string; done: Promise<void> } {
+  const id = newId();
+  const done = send('PUT', `/api/notebooks/${enc(id)}`, { title: cleanTitle(input.title), subjectId: input.subjectId }).then(() => undefined);
+  return { id, done };
+}
+
+export async function renameNotebook(_uid: string, id: string, title: string): Promise<void> {
+  await send('PATCH', `/api/notebooks/${enc(id)}`, { title: cleanTitle(title) });
+}
+
+export async function updateNotebook(
+  _uid: string,
   id: string,
-  next: (n: Notebook | null) => void,
-  fail: (e: unknown) => void,
-) {
-  return onSnapshot(
-    doc(notebooksCol(uid), id),
-    (snap) =>
-      next(snap.exists() ? parseNotebook(snap.id, snap.data({ serverTimestamps: 'estimate' })) : null),
-    fail,
-  );
-}
-
-/**
- * Creates a notebook with its first (empty) page. Returns the id right away;
- * the write is applied locally and synced in the background (works offline).
- */
-export function createNotebook(
-  uid: string,
-  input: { title: string; subjectId: string | null },
-): { id: string; done: Promise<void> } {
-  const { db } = getFirebase();
-  const ref = doc(notebooksCol(uid));
-  const batch = writeBatch(db);
-  batch.set(ref, {
-    title: cleanTitle(input.title),
-    subjectId: input.subjectId,
-    mode: 'paged',
-    paper: 'dots',
-    background: 'white',
-    pageCount: 1,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  batch.set(doc(ref, 'pages', 'p0'), { index: 0, elements: [], updatedAt: serverTimestamp() });
-  return { id: ref.id, done: batch.commit() };
-}
-
-export function renameNotebook(uid: string, id: string, title: string): Promise<void> {
-  return updateDoc(doc(notebooksCol(uid), id), { title: cleanTitle(title), updatedAt: serverTimestamp() });
-}
-
-export function updateNotebook(
-  uid: string,
-  id: string,
-  patch: Partial<Pick<NotebookData, 'mode' | 'paper' | 'background' | 'subjectId' | 'pageCount'>>,
+  patch: Partial<Pick<Notebook, 'paper' | 'background' | 'subjectId'>>,
 ): Promise<void> {
-  return updateDoc(doc(notebooksCol(uid), id), { ...patch, updatedAt: serverTimestamp() });
+  await send('PATCH', `/api/notebooks/${enc(id)}`, patch);
 }
 
-/** Deletes every page, the typed note and its images, then the notebook. */
-export async function deleteNotebook(uid: string, id: string): Promise<void> {
-  const { db } = getFirebase();
-  const ref = doc(notebooksCol(uid), id);
-  const pages = await getDocs(collection(ref, 'pages'));
-  for (let i = 0; i < pages.docs.length; i += 450) {
-    const batch = writeBatch(db);
-    for (const page of pages.docs.slice(i, i + 450)) batch.delete(page.ref);
-    await batch.commit();
-  }
-  await deleteDoc(doc(ref, 'notes', 'main'));
-  // Note images live in Storage; remove them too (best effort: the notebook is already gone).
-  const { storage } = getFirebase();
-  const images = await listAll(storageRef(storage, `users/${uid}/notes/${id}`)).catch(() => null);
-  await Promise.all((images?.items ?? []).map((item) => deleteObject(item).catch(() => undefined)));
-  await deleteDoc(ref);
+/** Deletes the notebook with every page, its typed note, and its images. */
+export async function deleteNotebook(_uid: string, id: string): Promise<void> {
+  await send('DELETE', `/api/notebooks/${enc(id)}`);
 }
 
 /** Elements of the first page (for dashboard thumbnails). */
-export function subscribeFirstPage(
-  uid: string,
-  id: string,
-  next: (els: Element[]) => void,
-  fail: (e: unknown) => void,
-) {
-  return onSnapshot(
-    query(collection(notebooksCol(uid), id, 'pages'), orderBy('index', 'asc'), limitTo(1)),
-    (snap) => next(parseElements(snap.docs[0]?.data().elements)),
+export function subscribeFirstPage(_uid: string, id: string, next: (els: Element[]) => void, fail: (e: unknown) => void) {
+  return live(
+    async () => {
+      const pages = await getJson(`/api/notebooks/${enc(id)}/pages?first=1`, z.array(z.object({ elements: z.unknown() })));
+      return parseElements(pages[0]?.elements);
+    },
+    [`pages:${id}`],
+    next,
     fail,
   );
 }

@@ -1,29 +1,12 @@
-import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
-import { getFirebase } from './firebase';
-import { DEFAULT_SETTINGS, type Settings, settingsSchema } from './models';
+import { type Settings, settingsSchema } from '../shared/schemas';
+import { getJson, send } from './api';
+import { live } from './events';
 
-function profileRef(uid: string) {
-  return doc(getFirebase().db, 'users', uid);
+export function subscribeSettings(_uid: string, next: (s: Settings) => void, fail: (e: unknown) => void) {
+  return live(() => getJson('/api/settings', settingsSchema), ['settings'], next, fail);
 }
 
-export function subscribeSettings(uid: string, next: (s: Settings) => void, fail: (e: unknown) => void) {
-  return onSnapshot(
-    profileRef(uid),
-    (snap) => {
-      const raw: unknown = snap.data()?.settings;
-      next(
-        settingsSchema.parse({
-          ...DEFAULT_SETTINGS,
-          ...(typeof raw === 'object' && raw !== null ? raw : {}),
-        }),
-      );
-    },
-    fail,
-  );
-}
-
-/** Merges settings into the profile document (creates it on first save). */
-export async function saveSettings(uid: string, patch: Partial<Settings>): Promise<void> {
-  const settings = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
-  await setDoc(profileRef(uid), { settings, updatedAt: serverTimestamp() }, { merge: true });
+export async function saveSettings(_uid: string, patch: Partial<Settings>): Promise<void> {
+  const body = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
+  await send('PATCH', '/api/settings', body);
 }

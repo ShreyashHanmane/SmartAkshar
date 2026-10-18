@@ -17,7 +17,11 @@ export interface StoreDeps {
   setTimer: (fn: () => void, ms: number) => number;
   clearTimer: (id: number) => void;
   now: () => number;
+  /** True for "server unreachable" errors: keep the edit and retry later, never give up. */
+  isTransient?: (error: unknown) => boolean;
 }
+
+export const TRANSIENT_RETRY_MS = 3000;
 
 export interface Snapshot {
   loadState: 'loading' | 'ready' | 'error';
@@ -183,8 +187,14 @@ export class EditorStore {
         this.attempts.delete(id);
         if (this.attempts.size === 0) this.failed = false;
       })
-      .catch(() => {
-        // Rejected by the server (offline writes stay queued and don't reject).
+      .catch((error: unknown) => {
+        if (this.deps.isTransient?.(error)) {
+          // Server unreachable: keep the edit and try again until it is back.
+          this.dirty.add(id);
+          this.deps.setTimer(() => this.flush(), TRANSIENT_RETRY_MS);
+          return;
+        }
+        // Rejected by the server: retry with backoff, then show Error.
         const attempt = this.attempts.get(id) ?? 0;
         this.attempts.set(id, attempt + 1);
         const delay = retryDelay(attempt);

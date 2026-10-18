@@ -17,7 +17,6 @@ describe('safeNextPath', () => {
     '/x\u0000y',
     '/login',
     '/signup?next=/',
-    '/verify-email',
     `/${'a'.repeat(600)}`,
   ])('rejects %j', (input) => {
     expect(safeNextPath(input)).toBe('/');

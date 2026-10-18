@@ -1,163 +1,108 @@
-import {
-  type User,
-  EmailAuthProvider,
-  GoogleAuthProvider,
-  createUserWithEmailAndPassword,
-  linkWithCredential,
-  linkWithPopup,
-  onIdTokenChanged,
-  reload,
-  sendEmailVerification,
-  sendPasswordResetEmail,
-  signInAnonymously,
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  signOut,
-  updateProfile,
-} from 'firebase/auth';
-import { clearIndexedDbPersistence, terminate } from 'firebase/firestore';
-import { getFirebase } from './firebase';
+import { type User, userSchema } from '../shared/schemas';
+import { ApiError, apiErrorCode, request, send } from './api';
+import { closeEvents } from './events';
 
-/** The app's view of the signed-in person. UI code never sees the Firebase User object. */
+/** The app's view of the signed-in person. */
 export interface SessionUser {
   uid: string;
-  email: string | null;
-  displayName: string | null;
-  photoURL: string | null;
-  isGuest: boolean;
-  emailVerified: boolean;
-  /** True for password accounts that still need to verify their email. */
-  needsVerification: boolean;
-  providers: string[];
+  username: string;
+  displayName: string;
 }
 
-export function toSessionUser(user: User): SessionUser {
-  const providers = user.providerData.map((p) => p.providerId);
-  const isGuest = user.isAnonymous;
-  // Fail safe: verification is required unless a federated provider (Google) is
-  // linked. providerData can be briefly empty right after account creation.
-  const passwordOnly = providers.every((p) => p === 'password');
-  return {
-    uid: user.uid,
-    email: user.email,
-    displayName: user.displayName,
-    photoURL: user.photoURL,
-    isGuest,
-    emailVerified: user.emailVerified,
-    needsVerification: !isGuest && passwordOnly && !user.emailVerified,
-    providers,
-  };
+const toSession = (u: User): SessionUser => ({ uid: u.id, username: u.username, displayName: u.displayName });
+
+let current: SessionUser | null | undefined;
+const listeners = new Set<(u: SessionUser | null) => void>();
+
+function publish(user: SessionUser | null) {
+  current = user;
+  for (const l of listeners) l(user);
+}
+
+async function readUser(res: Response): Promise<SessionUser | null> {
+  const body = (await res.json()) as { user: unknown };
+  return body.user ? toSession(userSchema.parse(body.user)) : null;
 }
 
 /**
- * Uses onIdTokenChanged rather than onAuthStateChanged: it also fires when a guest
- * is upgraded in place (same uid) and after profile/verification refreshes.
+ * Calls back with the session (null when signed out). The first answer comes
+ * from the server; if the server can't be reached it retries until it can.
  */
 export function observeSession(callback: (user: SessionUser | null) => void): () => void {
-  return onIdTokenChanged(getFirebase().auth, (user) => callback(user ? toSessionUser(user) : null));
+  listeners.add(callback);
+  if (current !== undefined) callback(current);
+  else void loadSession();
+  return () => listeners.delete(callback);
 }
 
-function currentUser(): User | null {
-  return getFirebase().auth.currentUser;
+let loading: Promise<void> | null = null;
+function loadSession(): Promise<void> {
+  loading ??= (async () => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        publish(await readUser(await request('GET', '/api/auth/me')));
+        return;
+      } catch {
+        await new Promise((r) => setTimeout(r, Math.min(5000, 500 * 2 ** attempt)));
+      }
+    }
+  })().finally(() => {
+    loading = null;
+  });
+  return loading;
 }
 
-function verificationSettings() {
-  return { url: `${window.location.origin}/verify-email`, handleCodeInApp: false };
+export async function signIn(username: string, password: string): Promise<void> {
+  publish(await readUser(await request('POST', '/api/auth/login', { json: { username, password } })));
 }
 
-export async function signInWithEmail(email: string, password: string): Promise<void> {
-  await signInWithEmailAndPassword(getFirebase().auth, email, password);
+export async function signUp(name: string, username: string, password: string): Promise<void> {
+  publish(await readUser(await request('POST', '/api/auth/signup', { json: { name, username, password } })));
 }
 
-/**
- * Creates a password account. When a guest is signed in, the guest account is
- * upgraded in place (same uid), so all guest data is kept.
- */
-export async function signUpWithEmail(name: string, email: string, password: string): Promise<void> {
-  const { auth } = getFirebase();
-  const guest = currentUser();
-  const user =
-    guest?.isAnonymous === true
-      ? (await linkWithCredential(guest, EmailAuthProvider.credential(email, password))).user
-      : (await createUserWithEmailAndPassword(auth, email, password)).user;
-  await updateProfile(user, { displayName: name });
-  await sendEmailVerification(user, verificationSettings());
-  await reload(user);
-  // Fresh token so session listeners see the new name and provider.
-  await user.getIdToken(true);
+export async function changePassword(current: string, next: string): Promise<void> {
+  await send('POST', '/api/auth/password', { current, next });
 }
 
-/** Google sign-in. A signed-in guest is upgraded in place (same uid). */
-export async function signInWithGoogle(): Promise<void> {
-  const { auth } = getFirebase();
-  const provider = new GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: 'select_account' });
-  const guest = currentUser();
-  if (guest?.isAnonymous) {
-    const { user } = await linkWithPopup(guest, provider);
-    await reload(user);
-    await user.getIdToken(true);
-    return;
-  }
-  await signInWithPopup(auth, provider);
+export async function updateDisplayName(displayName: string): Promise<void> {
+  publish(await readUser(await request('PATCH', '/api/account', { json: { displayName } })));
 }
 
-export async function continueAsGuest(): Promise<void> {
-  await signInAnonymously(getFirebase().auth);
-}
-
-export async function requestPasswordReset(email: string): Promise<void> {
-  try {
-    await sendPasswordResetEmail(getFirebase().auth, email, { url: `${window.location.origin}/login` });
-  } catch (error) {
-    // Never reveal whether an account exists for this email.
-    if (authErrorCode(error) === 'auth/user-not-found') return;
-    throw error;
-  }
-}
-
-export async function resendVerificationEmail(): Promise<void> {
-  const user = currentUser();
-  if (!user) throw new Error('Not signed in');
-  await sendEmailVerification(user, verificationSettings());
-}
-
-/** Reloads the user from the server and returns the fresh session (e.g. after verifying email). */
-export async function refreshSession(): Promise<SessionUser | null> {
-  const user = currentUser();
-  if (!user) return null;
-  await reload(user);
-  await user.getIdToken(true);
-  return toSessionUser(user);
+export async function deleteAccount(password: string): Promise<void> {
+  await send('POST', '/api/account/delete', { password });
+  await clearLocalData();
+  publish(null);
 }
 
 export const LOCAL_KEY_PREFIX = 'akshar:';
 
-/**
- * Signs out and removes everything this device cached for the user, so a shared
- * device does not leak data: Firestore offline cache, Cache Storage, and app keys
- * in localStorage/sessionStorage. Callers should then do a full page navigation.
- */
-export async function signOutAndClear(): Promise<void> {
-  const { auth, db } = getFirebase();
-  await signOut(auth);
-  await terminate(db).catch(() => undefined);
-  await clearIndexedDbPersistence(db).catch(() => undefined);
+async function clearLocalData() {
+  closeEvents();
   if ('caches' in window) {
     const keys = await caches.keys();
     await Promise.all(keys.map((key) => caches.delete(key)));
   }
   for (const storage of [window.localStorage, window.sessionStorage]) {
-    for (const key of Object.keys(storage)) {
-      if (key.startsWith(LOCAL_KEY_PREFIX)) storage.removeItem(key);
-    }
+    for (const key of Object.keys(storage)) if (key.startsWith(LOCAL_KEY_PREFIX)) storage.removeItem(key);
+  }
+}
+
+/**
+ * Signs out and removes everything this browser cached for the user (Cache
+ * Storage, app keys in local/session storage), so a shared computer doesn't
+ * leak data. Callers then do a full page navigation.
+ */
+export async function signOutAndClear(): Promise<void> {
+  try {
+    await send('POST', '/api/auth/logout');
+  } finally {
+    await clearLocalData();
+    publish(null);
   }
 }
 
 export function authErrorCode(error: unknown): string | undefined {
-  if (typeof error === 'object' && error !== null && 'code' in error) {
-    const code = (error as { code: unknown }).code;
-    return typeof code === 'string' ? code : undefined;
-  }
-  return undefined;
+  return apiErrorCode(error);
 }
+
+export { ApiError };

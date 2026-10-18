@@ -121,7 +121,7 @@ export function DashboardPage() {
   const hours = focusHoursThisWeek(days, today);
   const streak = studyStreak(days, today);
   const percent = goalPercent(hours, settings.weeklyGoalHours);
-  const name = user.isGuest ? t('home.guestName') : (user.displayName ?? user.email ?? '');
+  const name = user.displayName;
   const dateLabel = new Intl.DateTimeFormat(settings.locale, {
     weekday: 'long',
     month: 'long',

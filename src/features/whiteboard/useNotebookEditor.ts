@@ -1,14 +1,15 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { toStored } from '../../data/elements';
 import { addPage, replaceAllPages, savePage, subscribePages, touchNotebook } from '../../data/pages';
-import { useOnline } from '../../ui/useOnline';
+import { ApiError } from '../../data/api';
+import { useServerReachable } from '../../ui/useOnline';
 import { EditorStore } from './editorStore';
 import type { Element } from './model';
 import { estimateBytes, saveStatus } from './saveState';
 
 /** Connects an EditorStore to Firestore for one notebook. */
 export function useNotebookEditor(uid: string, notebookId: string) {
-  const online = useOnline();
+  const online = useServerReachable();
   const [store] = useState(
     () =>
       new EditorStore({
@@ -19,6 +20,7 @@ export function useNotebookEditor(uid: string, notebookId: string) {
         setTimer: (fn, ms) => window.setTimeout(fn, ms),
         clearTimer: (id) => window.clearTimeout(id),
         now: () => Date.now(),
+        isTransient: (e) => e instanceof ApiError && e.status === 0,
       }),
   );
   const snap = useSyncExternalStore(store.subscribe, store.getSnapshot);

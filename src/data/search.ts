@@ -1,6 +1,5 @@
-import { collection, getDocs, limit, query } from 'firebase/firestore';
 import { z } from 'zod';
-import { getFirebase } from './firebase';
+import { getJson } from './api';
 
 export type SearchKind = 'subject' | 'notebook' | 'book' | 'deck';
 
@@ -13,49 +12,28 @@ export interface SearchItem {
   href: string;
 }
 
-const MAX_PER_KIND = 500;
-const titled = z.object({
-  title: z.string().max(200),
-  subjectId: z.string().nullish(),
-  author: z.string().max(200).nullish(),
+const indexSchema = z.object({
+  subjects: z.array(z.object({ id: z.string(), name: z.string() })),
+  notebooks: z.array(z.object({ id: z.string(), title: z.string(), subjectId: z.string().nullable() })),
+  books: z.array(z.object({ id: z.string(), title: z.string(), author: z.string().nullable() })),
+  decks: z.array(z.object({ id: z.string(), title: z.string() })),
 });
-const subject = z.object({ name: z.string().max(40) });
 
-/**
- * Loads a small title index of the user's own items for client-side search.
- * Firestore has no full-text search, and each student's library is small.
- */
-export async function loadSearchIndex(uid: string): Promise<SearchItem[]> {
-  const { db } = getFirebase();
-  const read = (name: string) => getDocs(query(collection(db, 'users', uid, name), limit(MAX_PER_KIND)));
-  const [subjects, notebooks, books, decks] = await Promise.all(
-    ['subjects', 'notebooks', 'books', 'decks'].map(read),
-  );
-
-  const subjectNames = new Map<string, string>();
-  const items: SearchItem[] = [];
-  for (const d of subjects?.docs ?? []) {
-    const parsed = subject.safeParse(d.data());
-    if (!parsed.success) continue;
-    subjectNames.set(d.id, parsed.data.name);
-    items.push({
-      kind: 'subject',
-      id: d.id,
-      title: parsed.data.name,
-      href: `/notebooks?subject=${encodeURIComponent(d.id)}`,
-    });
-  }
-  const add = (snap: typeof subjects, kind: SearchItem['kind'], href: (id: string) => string) => {
-    for (const d of snap?.docs ?? []) {
-      const parsed = titled.safeParse(d.data());
-      if (!parsed.success) continue;
-      const detail =
-        parsed.data.author ?? (parsed.data.subjectId ? subjectNames.get(parsed.data.subjectId) : undefined);
-      items.push({ kind, id: d.id, title: parsed.data.title, detail, href: href(d.id) });
-    }
-  };
-  add(notebooks, 'notebook', (id) => `/notebooks/${encodeURIComponent(id)}`);
-  add(books, 'book', (id) => `/library/${encodeURIComponent(id)}`);
-  add(decks, 'deck', (id) => `/flashcards/${encodeURIComponent(id)}`);
-  return items;
+/** A small title index of the user's own items for client-side search. */
+export async function loadSearchIndex(_uid: string): Promise<SearchItem[]> {
+  const index = await getJson('/api/search-index', indexSchema);
+  const subjectNames = new Map(index.subjects.map((s) => [s.id, s.name]));
+  const enc = encodeURIComponent;
+  return [
+    ...index.subjects.map((s) => ({ kind: 'subject' as const, id: s.id, title: s.name, href: `/notebooks?subject=${enc(s.id)}` })),
+    ...index.notebooks.map((n) => ({
+      kind: 'notebook' as const,
+      id: n.id,
+      title: n.title,
+      detail: n.subjectId ? subjectNames.get(n.subjectId) : undefined,
+      href: `/notebooks/${enc(n.id)}`,
+    })),
+    ...index.books.map((b) => ({ kind: 'book' as const, id: b.id, title: b.title, detail: b.author ?? undefined, href: `/library/${enc(b.id)}` })),
+    ...index.decks.map((d) => ({ kind: 'deck' as const, id: d.id, title: d.title, href: `/flashcards/${enc(d.id)}` })),
+  ];
 }

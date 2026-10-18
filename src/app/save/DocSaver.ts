@@ -4,6 +4,8 @@ export interface DocSaverDeps<T> {
   save: (value: T) => Promise<void>;
   setTimer: (fn: () => void, ms: number) => number;
   clearTimer: (id: number) => void;
+  /** True for "server unreachable" errors: keep the edit and retry later, never give up. */
+  isTransient?: (error: unknown) => boolean;
 }
 
 export interface DocSaverState {
@@ -69,7 +71,18 @@ export class DocSaver<T> {
         this.attempts = 0;
         this.set({ inFlight: this.state.inFlight - 1, failed: false });
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        if (this.deps.isTransient?.(error)) {
+          this.set({ inFlight: this.state.inFlight - 1 });
+          this.deps.setTimer(() => {
+            if (this.savedVersion < version && !this.state.dirty) {
+              this.set({ dirty: true });
+              this.flush();
+            }
+          }, 3000);
+          if (this.savedVersion < version) this.set({ dirty: true });
+          return;
+        }
         const delay = retryDelay(this.attempts++);
         this.set({ inFlight: this.state.inFlight - 1, failed: delay === null });
         if (delay !== null)

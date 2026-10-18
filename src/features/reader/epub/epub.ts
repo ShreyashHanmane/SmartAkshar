@@ -1,5 +1,5 @@
 import DOMPurify from 'dompurify';
-import { IMAGE_MIME, sniffImage } from '../../../data/uploads';
+import { IMAGE_MIME, sniffImage } from '../../../shared/images';
 import { ZipArchive, ZipError, resolveHref } from './zip';
 
 export interface EpubChapter {

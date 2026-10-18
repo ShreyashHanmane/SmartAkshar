@@ -126,7 +126,7 @@ function Reader({ book }: { book: Book }) {
     };
     // The file never changes for a book.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [book.storagePath]);
+  }, [book.id]);
 
   // Save reading progress (debounced).
   useEffect(() => {

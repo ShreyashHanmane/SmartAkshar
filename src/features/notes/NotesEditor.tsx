@@ -2,18 +2,13 @@ import Image from '@tiptap/extension-image';
 import { type Editor, EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import DOMPurify from 'dompurify';
-import { type FormEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { type FormEvent, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { DocSaver } from '../../app/save/DocSaver';
+import { ApiError } from '../../data/api';
 import { useSignedInUser } from '../../app/session/SessionProvider';
 import { useStudyTracker } from '../../app/study/useStudyTracker';
-import {
-  type NoteContent,
-  allowedImageOrigins,
-  saveNote,
-  subscribeNote,
-  uploadNoteImage,
-} from '../../data/notes';
-import { NOTE_IMAGE_MAX_BYTES, checkImage } from '../../data/uploads';
+import { type NoteContent, saveNote, subscribeNote, uploadNoteImage } from '../../data/notes';
+import { NOTE_IMAGE_MAX_BYTES, checkImage } from '../../shared/images';
 import { type MessageKey, t } from '../../i18n/i18n';
 import { Alert } from '../../ui/Alert';
 import { Button } from '../../ui/Button';
@@ -21,14 +16,14 @@ import { Dialog } from '../../ui/Dialog';
 import { Icon, type IconName } from '../../ui/Icon';
 import { TextField } from '../../ui/TextField';
 import { useToast } from '../../ui/Toast';
-import { useOnline } from '../../ui/useOnline';
+import { useServerReachable } from '../../ui/useOnline';
 import { PAGE_BYTES_LIMIT, type SaveStatus, saveStatus } from '../whiteboard/saveState';
-import { cleanContent, isOwnImage, isSafeHref } from './clean';
+import { cleanContent, isOwnImage, isSafeHref } from '../../shared/clean';
 
 /** Sanitises pasted HTML before ProseMirror parses it: no scripts, no unsafe links, no foreign images. */
-function sanitizePaste(html: string, uid: string, origins: string[]): string {
+function sanitizePaste(html: string): string {
   const hook = (node: globalThis.Element) => {
-    if (node.tagName === 'IMG' && !isOwnImage(node.getAttribute('src'), uid, origins)) node.remove();
+    if (node.tagName === 'IMG' && !isOwnImage(node.getAttribute('src'))) node.remove();
     if (node.tagName === 'A' && !isSafeHref(node.getAttribute('href'))) node.removeAttribute('href');
   };
   DOMPurify.addHook('afterSanitizeAttributes', hook);
@@ -139,8 +134,7 @@ export function NotesEditor({
 }) {
   const user = useSignedInUser();
   const toast = useToast();
-  const online = useOnline();
-  const origins = useMemo(() => allowedImageOrigins(), []);
+  const online = useServerReachable();
   const fileRef = useRef<HTMLInputElement>(null);
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
   const loaded = useRef(false);
@@ -156,6 +150,7 @@ export function NotesEditor({
         save: (content) => saveNote(user.uid, notebookId, content),
         setTimer: (fn, ms) => window.setTimeout(fn, ms),
         clearTimer: (id) => window.clearTimeout(id),
+        isTransient: (e) => e instanceof ApiError && e.status === 0,
       }),
   );
   const saverState = useSyncExternalStore(saver.subscribe, saver.getState);
@@ -192,7 +187,7 @@ export function NotesEditor({
         role: 'textbox',
         'aria-multiline': 'true',
       },
-      transformPastedHTML: (html) => sanitizePaste(html, user.uid, origins),
+      transformPastedHTML: (html) => sanitizePaste(html),
       handlePaste: (_view, event) => {
         const files = [...(event.clipboardData?.files ?? [])].filter((f) => f.type.startsWith('image/'));
         if (!files.length) return false;
@@ -208,7 +203,7 @@ export function NotesEditor({
       },
     },
     onUpdate: ({ editor: e }) => {
-      const content = cleanContent(e.getJSON(), user.uid, origins) as unknown as NoteContent;
+      const content = cleanContent(e.getJSON()) as unknown as NoteContent;
       const big = new TextEncoder().encode(JSON.stringify(content)).length > PAGE_BYTES_LIMIT;
       setTooLarge(big);
       if (!big) saver.update(content);
@@ -224,7 +219,7 @@ export function NotesEditor({
       (content) => {
         const s = saver.getState();
         if (loaded.current && (s.dirty || s.inFlight > 0 || editor.isFocused)) return;
-        const clean = cleanContent(content ?? { type: 'doc' }, user.uid, origins);
+        const clean = cleanContent(content ?? { type: 'doc' });
         if (JSON.stringify(clean) !== JSON.stringify(editor.getJSON()))
           editor.commands.setContent(clean, { emitUpdate: false });
         loaded.current = true;
@@ -232,7 +227,7 @@ export function NotesEditor({
       },
       () => setLoadState('error'),
     );
-  }, [editor, user.uid, notebookId, origins, saver]);
+  }, [editor, user.uid, notebookId, saver]);
 
   useEffect(() => {
     editorRef.current = editor;
@@ -249,7 +244,7 @@ export function NotesEditor({
       toast.error(t('notes.imageOffline'));
       return;
     }
-    const max = user.isGuest ? NOTE_IMAGE_MAX_BYTES.guest : NOTE_IMAGE_MAX_BYTES.account;
+    const max = NOTE_IMAGE_MAX_BYTES;
     const check = checkImage(file.name || 'pasted.png', await readHead(file), file.size, max);
     if (!check.ok) {
       toast.error(
