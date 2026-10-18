@@ -1,8 +1,8 @@
 /**
- * Cleans Tiptap JSON loaded from storage (or produced by paste) before the
- * editor sees it. Treats stored notes as untrusted: only known node and mark
- * types survive, links must be http(s) or mailto, and images must come from the
- * owner's own Storage folder (no remote resources from user content).
+ * Cleans Tiptap JSON. Runs in the browser (on load, paste, and save) and on the
+ * server (on save). Treats notes as untrusted: only known node and mark types
+ * survive, links must be http(s) or mailto, and images must be the user's own
+ * uploads served by the local server (no remote resources from user content).
  */
 export interface JsonNode {
   type: string;
@@ -40,16 +40,14 @@ export function isSafeHref(href: unknown): href is string {
   }
 }
 
-/** Image URLs must point at the user's own folder in an allowed Storage origin. */
-export function isOwnImage(src: unknown, uid: string, allowedPrefixes: string[]): src is string {
-  if (typeof src !== 'string' || src.length > 2048) return false;
-  const ownFolder = `users%2F${encodeURIComponent(uid)}%2F`;
-  return allowedPrefixes.some(
-    (prefix) => src.startsWith(prefix) && src.slice(prefix.length).startsWith(ownFolder),
-  );
+/** Images must be uploads served by the local server (the server only serves a file to its owner). */
+const IMAGE_PATH = /^\/api\/files\/images\/[0-9a-f]{32}\.(png|jpg|gif|webp)$/;
+
+export function isOwnImage(src: unknown): src is string {
+  return typeof src === 'string' && IMAGE_PATH.test(src);
 }
 
-export function cleanContent(raw: unknown, uid: string, allowedPrefixes: string[]): JsonNode {
+export function cleanContent(raw: unknown): JsonNode {
   let count = 0;
   const empty: JsonNode = { type: 'doc', content: [{ type: 'paragraph' }] };
 
@@ -76,7 +74,7 @@ export function cleanContent(raw: unknown, uid: string, allowedPrefixes: string[
     }
     if (n.type === 'image') {
       const attrs = (n.attrs ?? {}) as Record<string, unknown>;
-      if (!isOwnImage(attrs.src, uid, allowedPrefixes)) return null;
+      if (!isOwnImage(attrs.src)) return null;
       out.attrs = { src: attrs.src, alt: typeof attrs.alt === 'string' ? attrs.alt.slice(0, 300) : null };
     }
     if (Array.isArray(n.marks)) {

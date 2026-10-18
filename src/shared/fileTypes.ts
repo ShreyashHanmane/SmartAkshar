@@ -7,10 +7,9 @@ export const BOOK_MIME: Record<BookFormat, string> = {
   txt: 'text/plain',
 };
 
-/** Strict limits: 25 MB per file for accounts, 5 MB for guests (also in storage.rules). */
-export const BOOK_MAX_BYTES = { account: 25 * 1024 * 1024, guest: 5 * 1024 * 1024 } as const;
-/** Total library size: 200 MB for accounts, 25 MB for guests (checked before upload). */
-export const LIBRARY_MAX_BYTES = { account: 200 * 1024 * 1024, guest: 25 * 1024 * 1024 } as const;
+/** Up to 25 MB per book; 200 MB of files per user (enforced by the server). */
+export const BOOK_MAX_BYTES = 25 * 1024 * 1024;
+export const USER_FILES_MAX_BYTES = 200 * 1024 * 1024;
 
 const ascii = (bytes: Uint8Array, start: number, length: number) =>
   String.fromCharCode(...bytes.subarray(start, start + length));

@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cleanContent, isOwnImage, isSafeHref } from './clean';
 
-const prefixes = ['https://firebasestorage.googleapis.com/v0/b/bucket/o/'];
-const own =
-  'https://firebasestorage.googleapis.com/v0/b/bucket/o/users%2Falice%2Fnotes%2Fn1%2Fx.png?alt=media&token=t';
+const own = `/api/files/images/${'a'.repeat(32)}.png`;
 
 describe('cleanContent', () => {
   it('keeps normal formatting', () => {
@@ -24,7 +22,7 @@ describe('cleanContent', () => {
         { type: 'image', attrs: { src: own, alt: 'diagram' } },
       ],
     };
-    expect(cleanContent(doc, 'alice', prefixes)).toEqual(doc);
+    expect(cleanContent(doc)).toEqual(doc);
   });
 
   it('drops scripts, unknown nodes, unsafe links, and foreign images', () => {
@@ -44,11 +42,12 @@ describe('cleanContent', () => {
           ],
         },
         { type: 'image', attrs: { src: 'https://tracker.example/pixel.png' } },
-        { type: 'image', attrs: { src: own.replace('alice', 'bob') } },
+        { type: 'image', attrs: { src: '/api/files/images/../../etc/passwd' } },
+        { type: 'image', attrs: { src: `//evil.example${own}` } },
         { type: 'heading', attrs: { level: 9 }, content: [{ type: 'text', text: 'h' }] },
       ],
     };
-    expect(cleanContent(doc, 'alice', prefixes)).toEqual({
+    expect(cleanContent(doc)).toEqual({
       type: 'doc',
       content: [
         { type: 'paragraph', content: [{ type: 'text', text: 'click' }] },
@@ -59,13 +58,13 @@ describe('cleanContent', () => {
 
   it('returns an empty document for garbage', () => {
     for (const raw of [null, 'x', { type: 'paragraph' }, { type: 'doc', content: [] }])
-      expect(cleanContent(raw, 'alice', prefixes)).toEqual({ type: 'doc', content: [{ type: 'paragraph' }] });
+      expect(cleanContent(raw)).toEqual({ type: 'doc', content: [{ type: 'paragraph' }] });
   });
 
   it('survives absurd nesting', () => {
     let node: Record<string, unknown> = { type: 'text', text: 'deep' };
     for (let i = 0; i < 500; i++) node = { type: 'blockquote', content: [node] };
-    expect(() => cleanContent({ type: 'doc', content: [node] }, 'alice', prefixes)).not.toThrow();
+    expect(() => cleanContent({ type: 'doc', content: [node] })).not.toThrow();
   });
 });
 
@@ -83,9 +82,14 @@ describe('url checks', () => {
     ])
       expect(isSafeHref(bad)).toBe(false);
   });
-  it('only accepts images in the owner folder of an allowed origin', () => {
-    expect(isOwnImage(own, 'alice', prefixes)).toBe(true);
-    expect(isOwnImage(own, 'bob', prefixes)).toBe(false);
-    expect(isOwnImage('https://evil.example/v0/b/bucket/o/users%2Falice%2Fx', 'alice', prefixes)).toBe(false);
+  it('only accepts images served by the local server', () => {
+    expect(isOwnImage(own)).toBe(true);
+    for (const bad of [
+      `https://evil.example${own}`,
+      `${own}?x`,
+      '/api/files/books/x.pdf',
+      'data:image/png;base64,AAAA',
+    ])
+      expect(isOwnImage(bad)).toBe(false);
   });
 });

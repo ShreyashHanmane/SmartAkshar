@@ -1,7 +1,4 @@
-/**
- * Upload validation shared by note images and (Module 6) books. Types are
- * checked from the file's first bytes, not just its name or browser MIME type.
- */
+/** Image validation shared by the browser (early feedback) and the server (enforcement). */
 export type ImageKind = 'png' | 'jpeg' | 'gif' | 'webp';
 
 export const IMAGE_MIME: Record<ImageKind, string> = {
@@ -11,8 +8,10 @@ export const IMAGE_MIME: Record<ImageKind, string> = {
   webp: 'image/webp',
 };
 
-/** Note images: 5 MB for accounts, 2 MB for guests (also enforced in storage.rules). */
-export const NOTE_IMAGE_MAX_BYTES = { account: 5 * 1024 * 1024, guest: 2 * 1024 * 1024 } as const;
+export const IMAGE_EXT: Record<ImageKind, string> = { png: 'png', jpeg: 'jpg', gif: 'gif', webp: 'webp' };
+
+/** Note images: up to 5 MB each. */
+export const NOTE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 export function sniffImage(bytes: Uint8Array): ImageKind | null {
   const b = (i: number) => bytes[i] ?? -1;
@@ -49,10 +48,4 @@ export function checkImage(name: string, bytes: Uint8Array, size: number, maxByt
   if (!kind || !EXTENSIONS[kind].includes(ext)) return { ok: false, reason: 'type' };
   if (size > maxBytes || size === 0) return { ok: false, reason: 'size' };
   return { ok: true, kind };
-}
-
-/** Random, unguessable object name (never the user's file name). */
-export function randomName(ext: string): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  return `${[...bytes].map((x) => x.toString(16).padStart(2, '0')).join('')}.${ext}`;
 }
