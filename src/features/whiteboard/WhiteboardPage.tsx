@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useSignedInUser } from '../../app/session/SessionProvider';
 import { useSettings } from '../../app/settings/SettingsProvider';
 import { useStudyTracker } from '../../app/study/useStudyTracker';
@@ -13,6 +13,8 @@ import { Dialog } from '../../ui/Dialog';
 import { FullPageLoader } from '../../ui/FullPageLoader';
 import { Icon } from '../../ui/Icon';
 import { useToast } from '../../ui/Toast';
+import { NotesEditor } from '../notes/NotesEditor';
+import type { SaveStatus } from './saveState';
 import { DeleteNotebookDialog, RenameNotebookDialog } from '../notebooks/NotebookDialogs';
 import { SubjectsProvider, useSubject } from '../subjects/SubjectsProvider';
 import { BottomBar, TopBar } from './Bars';
@@ -73,7 +75,15 @@ function loadTools(): ToolState {
   };
 }
 
-function Editor({ notebook }: { notebook: Notebook }) {
+function Editor({
+  notebook,
+  tab,
+  onTab,
+}: {
+  notebook: Notebook;
+  tab: 'whiteboard' | 'notes';
+  onTab: (v: 'whiteboard' | 'notes') => void;
+}) {
   const { uid } = useSignedInUser();
   const { settings } = useSettings();
   const toast = useToast();
@@ -90,7 +100,15 @@ function Editor({ notebook }: { notebook: Notebook }) {
   const [dialog, setDialog] = useState<'rename' | 'delete' | null>(null);
   const [confirmPaged, setConfirmPaged] = useState<{ pages: Element[][]; outside: number } | null>(null);
   const [switching, setSwitching] = useState(false);
-  useStudyTracker();
+  const [notesSave, setNotesSave] = useState<{ status: SaveStatus; retry: () => void }>({
+    status: 'saved',
+    retry: () => undefined,
+  });
+  const onNotesStatus = useCallback(
+    (status: SaveStatus, retry: () => void) => setNotesSave({ status, retry }),
+    [],
+  );
+  useStudyTracker(tab === 'whiteboard');
 
   const isSmall = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
   const dock: Dock = dockState.dock ?? (isSmall ? 'bottom' : settings.toolbarSide);
@@ -246,6 +264,51 @@ function Editor({ notebook }: { notebook: Notebook }) {
     { label: t('common.delete'), icon: 'trash' as const, danger: true, onSelect: () => setDialog('delete') },
   ];
 
+  const notesMenu = [
+    {
+      label: t('notes.exportPdf'),
+      icon: 'download' as const,
+      disabled: true,
+      hint: t('common.comingSoon'),
+      onSelect: () => undefined,
+    },
+    {
+      label: t('notes.exportDocx'),
+      icon: 'download' as const,
+      disabled: true,
+      hint: t('common.comingSoon'),
+      onSelect: () => undefined,
+    },
+    { label: t('notebooks.rename'), icon: 'pencil' as const, onSelect: () => setDialog('rename') },
+    { label: t('common.delete'), icon: 'trash' as const, danger: true, onSelect: () => setDialog('delete') },
+  ];
+
+  if (tab === 'notes')
+    return (
+      <div ref={rootRef} className="flex h-dvh flex-col bg-canvas">
+        <TopBar
+          title={notebook.title}
+          subject={subject}
+          status={notesSave.status}
+          onRetry={notesSave.retry}
+          view={tab}
+          onView={onTab}
+          menu={notesMenu}
+        />
+        <div className="min-h-0 flex-1">
+          <NotesEditor notebookId={notebook.id} onStatus={onNotesStatus} />
+        </div>
+        {dialog === 'rename' && <RenameNotebookDialog notebook={notebook} onClose={() => setDialog(null)} />}
+        {dialog === 'delete' && (
+          <DeleteNotebookDialog
+            notebook={notebook}
+            onClose={() => setDialog(null)}
+            onDeleted={() => navigate('/notebooks')}
+          />
+        )}
+      </div>
+    );
+
   return (
     <div ref={rootRef} className="flex h-dvh flex-col bg-canvas">
       {!focus && (
@@ -254,8 +317,9 @@ function Editor({ notebook }: { notebook: Notebook }) {
           subject={subject}
           status={editor.status}
           onRetry={editor.retry}
-          mode={mode}
-          onMode={(m) => void switchMode(m)}
+          view="whiteboard"
+          onView={onTab}
+          mode={{ value: mode, onChange: (m) => void switchMode(m) }}
           menu={menu}
         />
       )}
@@ -372,6 +436,10 @@ function Editor({ notebook }: { notebook: Notebook }) {
 function NotebookRoute() {
   const { uid } = useSignedInUser();
   const { notebookId = '' } = useParams();
+  const [params, setParams] = useSearchParams();
+  const view = params.get('view') === 'notes' ? 'notes' : 'whiteboard';
+  const setView = (v: 'whiteboard' | 'notes') =>
+    setParams(v === 'notes' ? { view: 'notes' } : {}, { replace: true });
   const validId = /^[A-Za-z0-9]{1,40}$/.test(notebookId) ? notebookId : null;
   const live = useLive<Notebook | null>(validId, (next, fail) =>
     validId ? subscribeNotebook(uid, validId, next, fail) : () => undefined,
@@ -394,7 +462,7 @@ function NotebookRoute() {
     );
   if (live.status === 'loading' || !live.data) return <FullPageLoader />;
   // Re-mount the editor per notebook so state never leaks between notebooks.
-  return <Editor key={live.data.id} notebook={live.data} />;
+  return <Editor key={live.data.id} notebook={live.data} tab={view} onTab={setView} />;
 }
 
 /** Full-screen whiteboard route (outside the app shell, so the tab bar is hidden). */

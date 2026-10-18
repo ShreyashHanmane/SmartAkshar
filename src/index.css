@@ -200,3 +200,83 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* Typed notes (Tiptap). Token colours only. */
+.notes-prose {
+  min-height: 50vh;
+  outline: none;
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.notes-prose > * + * {
+  margin-top: 0.75em;
+}
+.notes-prose h1 {
+  font-size: 1.875rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.notes-prose h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.notes-prose h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+.notes-prose ul {
+  list-style: disc;
+  padding-left: 1.5em;
+}
+.notes-prose ol {
+  list-style: decimal;
+  padding-left: 1.5em;
+}
+.notes-prose blockquote {
+  border-left: 4px solid var(--line-strong);
+  padding-left: 1em;
+  color: var(--ink-muted);
+}
+.notes-prose code {
+  background: var(--surface-sunken);
+  border-radius: 4px;
+  padding: 0.1em 0.3em;
+  font-family: ui-monospace, monospace;
+  font-size: 0.9em;
+}
+.notes-prose pre {
+  background: var(--surface-sunken);
+  border-radius: 8px;
+  padding: 0.75em 1em;
+  overflow-x: auto;
+}
+.notes-prose pre code {
+  background: none;
+  padding: 0;
+}
+.notes-prose a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.notes-prose hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+.notes-prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+.notes-prose img.ProseMirror-selectednode {
+  outline: 2px solid var(--focus);
+}
+.notes-prose p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--ink-muted);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

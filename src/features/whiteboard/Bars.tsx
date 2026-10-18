@@ -41,12 +41,14 @@ interface TopBarProps {
   subject: Subject | undefined;
   status: SaveStatus;
   onRetry: () => void;
-  mode: 'paged' | 'infinite';
-  onMode: (mode: 'paged' | 'infinite') => void;
+  view: 'whiteboard' | 'notes';
+  onView: (view: 'whiteboard' | 'notes') => void;
+  /** Paged | Infinite switch (whiteboard view only). */
+  mode?: { value: 'paged' | 'infinite'; onChange: (mode: 'paged' | 'infinite') => void };
   menu: MenuItem[];
 }
 
-export function TopBar({ title, subject, status, onRetry, mode, onMode, menu }: TopBarProps) {
+export function TopBar({ title, subject, status, onRetry, view, onView, mode, menu }: TopBarProps) {
   return (
     <header className="flex min-h-14 flex-wrap items-center gap-2 border-b border-line bg-surface px-2 py-1 sm:flex-nowrap sm:px-3">
       <Link
@@ -65,25 +67,40 @@ export function TopBar({ title, subject, status, onRetry, mode, onMode, menu }: 
         <h1 className="truncate text-sm font-semibold text-ink sm:text-base">{title}</h1>
       </div>
       <SavedChip status={status} onRetry={onRetry} />
-      <Segmented
-        label={t('whiteboard.mode')}
-        value={mode}
-        onChange={onMode}
-        options={[
-          { value: 'paged', label: t('whiteboard.mode.paged') },
-          { value: 'infinite', label: t('whiteboard.mode.infinite') },
-        ]}
-      />
       <button
         type="button"
         aria-label={t('whiteboard.ai')}
         aria-disabled="true"
         title={t('common.comingSoon')}
-        className="inline-flex size-11 shrink-0 cursor-not-allowed items-center justify-center rounded-lg text-ink opacity-60"
+        className="inline-flex size-11 shrink-0 cursor-not-allowed items-center justify-center rounded-lg text-ink opacity-60 sm:order-last"
       >
         <Icon name="sparkle" />
       </button>
-      <Menu label={t('whiteboard.more')} items={menu} />
+      <div className="sm:order-last">
+        <Menu label={t('whiteboard.more')} items={menu} />
+      </div>
+      <div className="order-last flex w-full flex-wrap justify-center gap-2 pb-1 sm:order-none sm:w-auto sm:pb-0">
+        <Segmented
+          label={t('notebook.view')}
+          value={view}
+          onChange={onView}
+          options={[
+            { value: 'whiteboard', label: t('notebook.view.whiteboard') },
+            { value: 'notes', label: t('notebook.view.notes') },
+          ]}
+        />
+        {mode && (
+          <Segmented
+            label={t('whiteboard.mode')}
+            value={mode.value}
+            onChange={mode.onChange}
+            options={[
+              { value: 'paged', label: t('whiteboard.mode.paged') },
+              { value: 'infinite', label: t('whiteboard.mode.infinite') },
+            ]}
+          />
+        )}
+      </div>
     </header>
   );
 }
