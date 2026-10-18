@@ -27,8 +27,12 @@ export function Dialog({ open, title, onClose, children, actions }: DialogProps)
     <dialog
       ref={ref}
       aria-labelledby={titleId}
-      onClose={onClose}
+      onClose={(e) => {
+        // Ignore "close" events React forwards from nested dialogs.
+        if (e.target === e.currentTarget) onClose();
+      }}
       onCancel={(e) => {
+        if (e.target !== e.currentTarget) return;
         e.preventDefault();
         onClose();
       }}

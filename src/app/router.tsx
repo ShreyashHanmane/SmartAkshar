@@ -3,7 +3,8 @@ import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage';
 import { LoginPage } from '../features/auth/LoginPage';
 import { SignUpPage } from '../features/auth/SignUpPage';
 import { VerifyEmailPage } from '../features/auth/VerifyEmailPage';
-import { HomePage } from '../features/home/HomePage';
+import { DashboardPage } from '../features/dashboard/DashboardPage';
+import { NotebooksPage } from '../features/notebooks/NotebooksPage';
 import { SearchPage } from '../features/search/SearchPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
 import { NotFoundPage } from './NotFoundPage';
@@ -55,8 +56,10 @@ export const router = createBrowserRouter([
           </RequireSession>
         ),
         children: [
-          { path: '/', element: <HomePage /> },
-          { path: '/notebooks', element: <ComingSoonPage title="nav.whiteboard" /> },
+          { path: '/', element: <DashboardPage /> },
+          { path: '/notebooks', element: <NotebooksPage /> },
+          // Whiteboard editor arrives in Module 4.
+          { path: '/notebooks/:notebookId', element: <ComingSoonPage title="nav.whiteboard" /> },
           { path: '/flashcards', element: <ComingSoonPage title="nav.flashcards" /> },
           { path: '/library', element: <ComingSoonPage title="nav.library" /> },
           { path: '/search', element: <SearchPage /> },

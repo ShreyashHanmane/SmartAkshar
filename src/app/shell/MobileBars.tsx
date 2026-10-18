@@ -34,7 +34,10 @@ export function MobileTopBar() {
       <dialog
         ref={dialogRef}
         aria-label={t('nav.main')}
-        onClose={() => setDrawer(false)}
+        onClose={(e) => {
+          // React forwards "close" from nested dialogs (e.g. a subject dialog); only react to our own.
+          if (e.target === e.currentTarget) setDrawer(false);
+        }}
         onClick={(e) => {
           if (e.target === dialogRef.current) setDrawer(false);
         }}
