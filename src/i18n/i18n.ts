@@ -28,3 +28,13 @@ export function getTranslator(locale: Locale = DEFAULT_LOCALE) {
 }
 
 export const t = getTranslator();
+
+export function isMessageKey(key: string): key is MessageKey {
+  return Object.hasOwn(en, key);
+}
+
+/** Translates a key that arrives as a plain string (e.g. a zod message). */
+export function tDynamic(key: string | undefined): string | undefined {
+  if (key === undefined) return undefined;
+  return isMessageKey(key) ? t(key) : t('auth.error.generic');
+}
