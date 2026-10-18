@@ -131,7 +131,9 @@ test('stats come from tracked study time and due cards', async ({ page }) => {
   await expect(page.getByText(sameWeek ? '1.5' : '1.0', { exact: true })).toBeVisible();
   await expect(page.getByText('2-day streak')).toBeVisible();
   await expect(page.getByText(sameWeek ? '15%' : '10%')).toBeVisible();
-  await expect(page.getByText('1', { exact: true }).first()).toBeVisible();
+  await expect(
+    page.locator('section').filter({ has: page.getByRole('heading', { name: 'Flashcards due' }) }),
+  ).toContainText(/1\s*cards today/);
   await expect(page.getByRole('link', { name: 'Review now' })).toHaveAttribute('href', '/flashcards/review');
 
   await page.getByRole('button', { name: 'Edit goal' }).click();

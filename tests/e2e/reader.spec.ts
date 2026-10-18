@@ -106,7 +106,11 @@ test('highlights PDF text, keeps it after reload, and removes it', async ({ page
   await expect(page.locator('.textLayer').getByText('inversely', { exact: false })).toBeAttached();
   await selectText(page, 'inversely');
   const menu = page.getByRole('toolbar', { name: 'Selected text' });
-  for (const name of ['Create flashcard', 'Explain', 'Summarize', 'Translate'])
+  await expect(menu.getByRole('button', { name: 'Create flashcard' })).not.toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+  for (const name of ['Explain', 'Summarize', 'Translate'])
     await expect(menu.getByRole('button', { name })).toHaveAttribute('aria-disabled', 'true');
   await menu.getByRole('button', { name: 'Highlight' }).click();
   await expect
