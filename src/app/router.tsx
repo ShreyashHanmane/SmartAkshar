@@ -4,6 +4,8 @@ import { SignUpPage } from '../features/auth/SignUpPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { NotebooksPage } from '../features/notebooks/NotebooksPage';
 import { SearchPage } from '../features/search/SearchPage';
+import { LibraryPage } from '../features/library/LibraryPage';
+import { ReaderPage } from '../features/reader/ReaderPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
 import { WhiteboardPage } from '../features/whiteboard/WhiteboardPage';
 import { NotFoundPage } from './NotFoundPage';
@@ -42,7 +44,7 @@ export const router = createBrowserRouter([
           { path: '/', element: <DashboardPage /> },
           { path: '/notebooks', element: <NotebooksPage /> },
           { path: '/flashcards', element: <ComingSoonPage title="nav.flashcards" /> },
-          { path: '/library', element: <ComingSoonPage title="nav.library" /> },
+          { path: '/library', element: <LibraryPage /> },
           { path: '/search', element: <SearchPage /> },
           { path: '/settings', element: <SettingsPage /> },
         ],
@@ -52,6 +54,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireSession>
             <WhiteboardPage />
+          </RequireSession>
+        ),
+      },
+      {
+        path: '/library/:bookId',
+        element: (
+          <RequireSession>
+            <ReaderPage />
           </RequireSession>
         ),
       },
