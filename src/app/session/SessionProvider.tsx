@@ -1,6 +1,6 @@
 import { type ReactNode, createContext, useContext, useEffect, useState } from 'react';
 import { observeSession, watchAccount } from '../../data/auth';
-import type { SessionState } from './guards';
+import type { SessionState } from './guardRules';
 
 const SessionContext = createContext<SessionState>({ status: 'loading' });
 

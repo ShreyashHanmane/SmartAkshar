@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type SessionState, guardProtected, guardPublicAuth } from './guards';
+import { type SessionState, guardProtected, guardPublicAuth } from './guardRules';
 
 const signedIn: SessionState = {
   status: 'signedIn',
