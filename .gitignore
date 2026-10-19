@@ -5,7 +5,7 @@ coverage/
 *.tsbuildinfo
 
 # Local data (the app's database and uploaded files) and test data
-data/
+/data/
 .tmp-test/
 
 # Local caches (kept inside the project on purpose)
