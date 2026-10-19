@@ -3,7 +3,7 @@ import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { FullPageLoader } from '../../ui/FullPageLoader';
 import { ServerDown } from '../../ui/ServerDown';
 import { useServerReachable } from '../../ui/useOnline';
-import { type GuardResult, guardProtected, guardPublicAuth } from './guards';
+import { type GuardResult, guardProtected, guardPublicAuth } from './guardRules';
 import { safeNextPath } from './redirect';
 import { useSession } from './SessionProvider';
 
