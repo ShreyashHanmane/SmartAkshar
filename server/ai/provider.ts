@@ -25,8 +25,11 @@ export interface AiProvider {
 
 export class AiProviderError extends Error {
   code: 'timeout' | 'blocked' | 'provider';
-  constructor(code: 'timeout' | 'blocked' | 'provider') {
+  /** Short, content-free reason for the logs (e.g. "http-404 NOT_FOUND", "empty MAX_TOKENS"). */
+  detail: string | undefined;
+  constructor(code: 'timeout' | 'blocked' | 'provider', detail?: string) {
     super(code);
     this.code = code;
+    this.detail = detail;
   }
 }

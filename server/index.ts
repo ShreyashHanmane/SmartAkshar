@@ -24,7 +24,7 @@ const distDir =
 
 // AI is optional: only on when a Gemini key is configured.
 const key = process.env.GEMINI_API_KEY?.trim();
-const ai = key ? new GeminiProvider(key, process.env.GEMINI_MODEL?.trim() || 'gemini-2.5-flash') : null;
+const ai = key ? new GeminiProvider(key, process.env.GEMINI_MODEL?.trim() || 'gemini-3.5-flash') : null;
 
 const app = createApp({ dataDir, distDir, ai, log: (m) => console.error(m) });
 app.server.listen(port, host, () => {

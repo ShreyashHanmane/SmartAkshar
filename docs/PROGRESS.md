@@ -356,3 +356,10 @@
 - `npm audit`: 0 vulnerabilities.
 
 **Left:** Lighthouse is not installed and would need a new package, so it hasn't been run; ask before adding it. Also left: a final review of upload limits and of the error boundary, then the module report.
+
+### Fix (2026-10-19): AI always failed with "AI isn't available"
+
+- **Cause:** Google retired `gemini-2.5-flash` for new API keys (404), and the server reported every provider failure as a generic 502. A second problem showed up while testing: newer models count thinking tokens against `maxOutputTokens`, so with default thinking a 1024-token answer came back empty.
+- **Fix:** the default model is now `gemini-3.5-flash` (still overridable with `GEMINI_MODEL`). Thinking is set to minimal (`thinkingBudget: 0` on 2.x models). The AI log line now carries a content-free `detail` (for example `http-404 NOT_FOUND`, `empty MAX_TOKENS`).
+- **Tests:** `server/ai/gemini.test.ts` (thinking config, upstream status, empty-answer reason) and an added assertion in `tests/server/ai.test.ts` that the detail is logged.
+- **Committed directly to main** at the user's explicit request (overrides §4's branch rule for this fix).

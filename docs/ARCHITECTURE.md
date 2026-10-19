@@ -56,7 +56,7 @@ data/            Local database (akshar.db) and uploaded files — gitignored, c
 
 ## AI (optional)
 
-- **Off by default.** The server enables AI only when `GEMINI_API_KEY` is set in `.env.local` (model from `GEMINI_MODEL`, default `gemini-2.5-flash`). Without a key, the AI panel says AI is off and how to turn it on.
+- **Off by default.** The server enables AI only when `GEMINI_API_KEY` is set in `.env.local` (model from `GEMINI_MODEL`, default `gemini-3.5-flash`; thinking is set to minimal because thinking tokens count against the output cap). Without a key, the AI panel says AI is off and how to turn it on.
 - **Server-side only:** the browser calls `POST /api/ai/run`; only `server/ai/` talks to the provider. The provider sits behind the `AiProvider` interface (`server/ai/provider.ts`), so it can be swapped.
 - **Limits:** session required; 5 requests per minute; 20 per user per day (stored in `ai_usage`, refunded when the provider fails); text up to 12,000 characters, handwriting images up to about 1.5 MB; 30-second timeout; capped output.
 - **Prompt injection:** fixed system instructions; student material is fenced in `<student_material>` tags (closing tags inside it are stripped) and treated as data. Output is plain text, rendered as text, never as HTML; generated flashcards are validated with zod.

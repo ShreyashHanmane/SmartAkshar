@@ -53,6 +53,7 @@ export async function aiRun(ctx: AiCtx) {
   const started = Date.now();
   const signal = AbortSignal.any([AbortSignal.timeout(AI_TIMEOUT_MS), abortOnClose(ctx.req)]);
   let status = 'ok';
+  let detail: string | undefined;
   let tokens: { in?: number | undefined; out?: number | undefined } = {};
   try {
     const out = await ctx.ai.generate({
@@ -74,6 +75,7 @@ export async function aiRun(ctx: AiCtx) {
       .prepare('UPDATE ai_usage SET count = MAX(0, count - 1) WHERE user_id = ? AND day = ?')
       .run(uid, today());
     status = error instanceof AiProviderError ? error.code : 'error';
+    if (error instanceof AiProviderError) detail = error.detail;
     if (error instanceof AiProviderError)
       throw new HttpError(
         error.code === 'timeout' ? 504 : error.code === 'blocked' ? 422 : 502,
@@ -89,6 +91,7 @@ export async function aiRun(ctx: AiCtx) {
         user: hashed,
         action: body.action,
         status,
+        detail,
         ms: Date.now() - started,
         tokensIn: tokens.in,
         tokensOut: tokens.out,

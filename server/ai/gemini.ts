@@ -1,5 +1,9 @@
 import { type AiInput, type AiOutput, type AiProvider, AiProviderError } from './provider.ts';
 
+interface GeminiError {
+  error?: { status?: string };
+}
+
 interface GeminiResponse {
   candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
   promptFeedback?: { blockReason?: string };
@@ -29,6 +33,11 @@ export class GeminiProvider implements AiProvider {
       generationConfig: {
         temperature: 0.3,
         maxOutputTokens: input.maxOutputTokens,
+        // Thinking tokens count against maxOutputTokens; left on, they can use
+        // the whole budget and return no text. These tasks don't need it.
+        thinkingConfig: this.model.startsWith('gemini-2')
+          ? { thinkingBudget: 0 }
+          : { thinkingLevel: 'minimal' },
         ...(input.json
           ? {
               responseMimeType: 'application/json',
@@ -57,17 +66,21 @@ export class GeminiProvider implements AiProvider {
       );
     } catch (error) {
       if (input.signal.aborted) throw new AiProviderError('timeout');
-      throw new AiProviderError(
-        error instanceof Error && error.name === 'TimeoutError' ? 'timeout' : 'provider',
-      );
+      if (error instanceof Error && error.name === 'TimeoutError') throw new AiProviderError('timeout');
+      throw new AiProviderError('provider', 'network');
     }
-    if (!res.ok) throw new AiProviderError('provider');
+    if (!res.ok) {
+      // Google's status code name only (e.g. NOT_FOUND), never the message body.
+      const err = (await res.json().catch(() => ({}))) as GeminiError;
+      const reason = /^[A-Z_]{1,40}$/.test(err.error?.status ?? '') ? ` ${err.error?.status}` : '';
+      throw new AiProviderError('provider', `http-${res.status}${reason}`);
+    }
     const data = (await res.json()) as GeminiResponse;
     if (data.promptFeedback?.blockReason) throw new AiProviderError('blocked');
     const candidate = data.candidates?.[0];
     if (candidate?.finishReason === 'SAFETY') throw new AiProviderError('blocked');
     const text = (candidate?.content?.parts ?? []).map((p) => p.text ?? '').join('');
-    if (!text) throw new AiProviderError('provider');
+    if (!text) throw new AiProviderError('provider', `empty ${candidate?.finishReason ?? 'no-candidate'}`);
     return {
       text,
       inputTokens: data.usageMetadata?.promptTokenCount,

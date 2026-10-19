@@ -111,6 +111,9 @@ describe('AI', () => {
     expect(await (await run(c, { action: 'explain', text: 'x' })).json()).toEqual({ error: 'ai-timeout' });
     fake.next = () => new AiProviderError('blocked');
     expect((await run(c, { action: 'explain', text: 'x' })).status).toBe(422);
+    fake.next = () => new AiProviderError('provider', 'http-404 NOT_FOUND');
+    expect((await run(c, { action: 'explain', text: 'x' })).status).toBe(502);
+    expect(logs.at(-1)).toMatch(/"status":"provider","detail":"http-404 NOT_FOUND"/);
     expect(await (await c.json('GET', '/api/ai/status')).json()).toMatchObject({ used: 0 });
   });
 
