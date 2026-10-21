@@ -98,14 +98,24 @@ export class EditorStore {
     const next = new Map<string, StorePage>();
     for (const page of remote) {
       const local = this.pages.get(page.id);
-      // A copy fetched before our latest confirmed save is stale: never let it win.
-      const stale = page.updatedAt !== undefined && page.updatedAt < (this.savedAt.get(page.id) ?? 0);
-      const busy = this.dirty.has(page.id) || this.inFlight.has(page.id) || stale;
+      const lastSaved = this.savedAt.get(page.id) ?? 0;
+      // A copy fetched at or before our latest confirmed save is stale: never let it win.
+      const stale = lastSaved > 0 && (page.updatedAt === undefined || page.updatedAt <= lastSaved);
+      const busy =
+        this.dirty.has(page.id) ||
+        this.inFlight.has(page.id) ||
+        this.attempts.has(page.id) ||
+        this.failed ||
+        stale;
       next.set(page.id, busy && local ? { ...local, index: page.index } : page);
     }
     // Keep local pages the server hasn't seen yet (e.g. added while offline).
     for (const [id, local] of this.pages)
-      if (!next.has(id) && (this.dirty.has(id) || this.inFlight.has(id))) next.set(id, local);
+      if (
+        !next.has(id) &&
+        (this.dirty.has(id) || this.inFlight.has(id) || this.attempts.has(id) || this.failed)
+      )
+        next.set(id, local);
     this.pages = next;
     this.loadState = 'ready';
     this.emit();
@@ -154,10 +164,17 @@ export class EditorStore {
     const index = this.pages.size;
     const { id, done } = this.deps.addPage(index);
     this.pages = new Map(this.pages).set(id, { id, index, elements: [] });
-    done.catch(() => {
-      this.failed = true;
-      this.emit();
-    });
+    this.inFlight.set(id, (this.inFlight.get(id) ?? 0) + 1);
+    done
+      .catch(() => {
+        this.failed = true;
+      })
+      .finally(() => {
+        const n = (this.inFlight.get(id) ?? 1) - 1;
+        if (n <= 0) this.inFlight.delete(id);
+        else this.inFlight.set(id, n);
+        this.emit();
+      });
     this.emit();
     return id;
   }
@@ -210,11 +227,11 @@ export class EditorStore {
         // Rejected by the server: retry with backoff, then show Error.
         const attempt = this.attempts.get(id) ?? 0;
         this.attempts.set(id, attempt + 1);
+        this.dirty.add(id);
         const delay = retryDelay(attempt);
         if (delay === null) this.failed = true;
         else
           this.deps.setTimer(() => {
-            this.dirty.add(id);
             this.flush();
           }, delay);
       })
@@ -235,6 +252,6 @@ export class EditorStore {
   }
 
   hasUnsent() {
-    return this.dirty.size > 0 || this.timer !== null;
+    return this.dirty.size > 0 || this.inFlight.size > 0 || this.timer !== null;
   }
 }

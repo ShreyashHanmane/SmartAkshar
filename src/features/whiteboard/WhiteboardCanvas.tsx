@@ -119,6 +119,10 @@ export function WhiteboardCanvas(props: Props) {
   const spaceHeld = useRef(false);
   const rendered = useRef<{ view: View; key: string; elements: Element[] } | null>(null);
   const settle = useRef<number | null>(null);
+  const elementsRef = useRef(elements);
+  useLayoutEffect(() => {
+    elementsRef.current = elements;
+  }, [elements]);
 
   // --- layout -------------------------------------------------------------
   useLayoutEffect(() => {
@@ -175,7 +179,17 @@ export function WhiteboardCanvas(props: Props) {
         prev.view.scale === v.scale &&
         prev.view.offsetX === v.offsetX &&
         prev.view.offsetY === v.offsetY;
-      // Fast path: only new elements were appended (the usual case after a stroke).
+      // Fast path: already identical (e.g. after immediate paint to base).
+      if (
+        prev &&
+        sameView &&
+        prev.key === key &&
+        elements.length === prev.elements.length &&
+        prev.elements.every((el, i) => elements[i] === el)
+      ) {
+        return;
+      }
+      // Fast path: only new elements were appended (the usual case after an external addition).
       if (
         prev &&
         sameView &&
@@ -334,9 +348,41 @@ export function WhiteboardCanvas(props: Props) {
   }, [drawLive, current]);
 
   // --- commits ------------------------------------------------------------
+  const paintToBase = useCallback(
+    (el: Element) => {
+      const baseCanvas = baseRef.current;
+      if (!baseCanvas || size.width === 0) return;
+      const ctx = baseCanvas.getContext('2d');
+      if (!ctx) return;
+      const dpr = window.devicePixelRatio || 1;
+      const v = viewRef.current;
+      ctx.save();
+      ctx.setTransform(v.scale * dpr, 0, 0, v.scale * dpr, v.offsetX * dpr, v.offsetY * dpr);
+      if (mode === 'paged') {
+        ctx.beginPath();
+        ctx.rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT);
+        ctx.clip();
+      }
+      drawElement(ctx, el);
+      ctx.restore();
+      if (rendered.current) {
+        rendered.current = {
+          ...rendered.current,
+          elements: [...rendered.current.elements, el],
+        };
+      }
+    },
+    [size.width, mode],
+  );
+
   const commit = useCallback(
     (next: Element[]) => {
-      if (onChange(next) === 'too-large') onPageFull();
+      const prev = elementsRef.current;
+      elementsRef.current = next;
+      if (onChange(next) === 'too-large') {
+        elementsRef.current = prev;
+        onPageFull();
+      }
     },
     [onChange, onPageFull],
   );
@@ -351,7 +397,8 @@ export function WhiteboardCanvas(props: Props) {
       if (!d) return;
       setDraft(null);
       const text = d.text.replace(/\s+$/, '');
-      const without = d.existing ? elements.filter((el) => el.id !== d.existing?.id) : elements;
+      const currentElements = elementsRef.current;
+      const without = d.existing ? currentElements.filter((el) => el.id !== d.existing?.id) : currentElements;
       if (!text) {
         if (d.existing) commit(without);
         return;
@@ -368,9 +415,9 @@ export function WhiteboardCanvas(props: Props) {
         text: text.slice(0, 5000),
       };
       if (d.existing && d.existing.text === el.text) return;
-      commit(d.existing ? elements.map((x) => (x.id === el.id ? el : x)) : [...elements, el]);
+      commit(d.existing ? currentElements.map((x) => (x.id === el.id ? el : x)) : [...currentElements, el]);
     },
-    [elements, commit, tool.color, tool.font, tool.textSize],
+    [commit, tool.color, tool.font, tool.textSize],
   );
 
   const openText = useCallback(
@@ -426,7 +473,22 @@ export function WhiteboardCanvas(props: Props) {
     if (e.pointerType === 'touch') {
       touches.current.set(e.pointerId, local(e));
       if (touches.current.size === 2) {
-        // A second finger cancels any stroke in progress and starts pinch/pan.
+        // Preserve any drawn points in progress before transitioning to pinch/pan.
+        const g = gesture.current;
+        if (g?.kind === 'draw' && g.points.length > 0) {
+          const hl = tool.tool === 'highlighter';
+          const strokeEl: Element = {
+            kind: 'stroke',
+            id: newId(),
+            tool: hl ? 'highlighter' : 'pen',
+            color: tool.color,
+            width: hl ? HIGHLIGHTER_WIDTH : tool.penWidth,
+            opacity: hl ? tool.hlOpacity / 100 : 1,
+            points: simplify(g.points, 0.35 / Math.max(viewRef.current.scale, 0.1)),
+          };
+          commit([...elementsRef.current, strokeEl]);
+          paintToBase(strokeEl);
+        }
         startPinch();
         return;
       }
@@ -518,14 +580,11 @@ export function WhiteboardCanvas(props: Props) {
     gesture.current = null;
     const cancelled = e.type === 'pointercancel';
     if (g.kind === 'pan') renderBase(viewRef.current);
-    else if (cancelled) {
-      // Stroke interrupted (e.g. the OS took the touch): keep nothing half-drawn.
-      setMoveOffset(null);
-    } else if (g.kind === 'draw') {
-      const hl = tool.tool === 'highlighter';
-      commit([
-        ...elements,
-        {
+    else if (g.kind === 'draw') {
+      // Writing in progress is preserved even if the gesture was cancelled by palm or lost capture.
+      if (g.points.length > 0) {
+        const hl = tool.tool === 'highlighter';
+        const strokeEl: Element = {
           kind: 'stroke',
           id: newId(),
           tool: hl ? 'highlighter' : 'pen',
@@ -533,19 +592,24 @@ export function WhiteboardCanvas(props: Props) {
           width: hl ? HIGHLIGHTER_WIDTH : tool.penWidth,
           opacity: hl ? tool.hlOpacity / 100 : 1,
           points: simplify(g.points, 0.35 / Math.max(viewRef.current.scale, 0.1)),
-        },
-      ]);
+        };
+        commit([...elementsRef.current, strokeEl]);
+        paintToBase(strokeEl);
+      }
+    } else if (cancelled) {
+      // Interrupted gesture (e.g. selection loop or move): discard in-progress offset.
+      setMoveOffset(null);
     } else if (g.kind === 'loop') {
       if (pathLength(g.points) > 24 / viewRef.current.scale) {
-        const ids = selectInLoop(elements, g.points);
+        const ids = selectInLoop(elementsRef.current, g.points);
         if (g.erase) {
-          if (ids.size) commit(removeSelected(elements, ids));
+          if (ids.size) commit(removeSelected(elementsRef.current, ids));
         } else setSelection(ids);
       } else if (!g.erase) setSelection(new Set());
     } else if (g.kind === 'shape') {
       if (Math.hypot(g.end.x - g.start.x, g.end.y - g.start.y) > 4) {
         commit([
-          ...elements,
+          ...elementsRef.current,
           {
             kind: 'shape',
             id: newId(),
@@ -561,7 +625,7 @@ export function WhiteboardCanvas(props: Props) {
       }
     } else if (g.kind === 'move') {
       setMoveOffset(null);
-      if (Math.abs(g.dx) + Math.abs(g.dy) > 0.5) commit(moveSelected(elements, liveSelection, g.dx, g.dy));
+      if (Math.abs(g.dx) + Math.abs(g.dy) > 0.5) commit(moveSelected(elementsRef.current, liveSelection, g.dx, g.dy));
     } else if (g.kind === 'text') openText(g.at);
     drawLive();
   }
@@ -615,12 +679,12 @@ export function WhiteboardCanvas(props: Props) {
         ArrowDown: [0, step],
       };
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        commit(removeSelected(elements, liveSelection));
+        commit(removeSelected(elementsRef.current, liveSelection));
         setSelection(new Set());
       } else if (e.key === 'Escape') setSelection(new Set());
       else if (moves[e.key]) {
         const [dx, dy] = moves[e.key] as [number, number];
-        commit(moveSelected(elements, liveSelection, dx, dy));
+        commit(moveSelected(elementsRef.current, liveSelection, dx, dy));
       } else return;
       e.preventDefault();
       return;
@@ -707,7 +771,7 @@ export function WhiteboardCanvas(props: Props) {
           count={liveSelection.size}
           onMove={() => liveRef.current?.focus()}
           onErase={() => {
-            commit(removeSelected(elements, liveSelection));
+            commit(removeSelected(elementsRef.current, liveSelection));
             setSelection(new Set());
           }}
           onDone={() => setSelection(new Set())}

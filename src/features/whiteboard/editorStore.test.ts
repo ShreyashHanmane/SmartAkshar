@@ -146,4 +146,67 @@ describe('EditorStore', () => {
     expect(store.getSnapshot().pages.map((p) => p.id)).toEqual(['p0', id]);
     vi.useRealTimers();
   });
+
+  it('regression: does not overwrite saved strokes when a remote snapshot arrives with the same or older updatedAt', async () => {
+    const { store, deps } = setup();
+    deps.save = () => Promise.resolve(2000);
+    store.setElements('p0', [el('stroke1')]);
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+    expect(store.getSnapshot().pages[0]?.elements.map((e) => e.id)).toEqual(['stroke1']);
+
+    // Snapshot from the refetch of the same save (updatedAt: 2000) must not overwrite writing with empty/older elements.
+    store.applyRemote([{ id: 'p0', index: 0, elements: [], updatedAt: 2000 }]);
+    expect(store.getSnapshot().pages[0]?.elements.map((e) => e.id)).toEqual(['stroke1']);
+
+    // Stale snapshot with older timestamp must also not overwrite.
+    store.applyRemote([{ id: 'p0', index: 0, elements: [], updatedAt: 1999 }]);
+    expect(store.getSnapshot().pages[0]?.elements.map((e) => e.id)).toEqual(['stroke1']);
+
+    // Snapshot missing updatedAt must not overwrite a confirmed save.
+    store.applyRemote([{ id: 'p0', index: 0, elements: [] }]);
+    expect(store.getSnapshot().pages[0]?.elements.map((e) => e.id)).toEqual(['stroke1']);
+    vi.useRealTimers();
+  });
+
+  it('regression: preserves local writing when remote updates arrive during retry backoff or after save failure', async () => {
+    const { store } = setup(() => Promise.reject(new Error('save-failed')));
+    store.setElements('p0', [el('stroke1')]);
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+
+    // Write failed; waiting for backoff retry. Remote update arriving during backoff must not clear strokes.
+    store.applyRemote([{ id: 'p0', index: 0, elements: [] }]);
+    expect(store.getSnapshot().pages[0]?.elements.map((e) => e.id)).toEqual(['stroke1']);
+
+    // Advance through all retries until store is in failed state.
+    for (const ms of [1000, 2000, 4000, 8000]) await vi.advanceTimersByTimeAsync(ms);
+    expect(store.getSnapshot().failed).toBe(true);
+
+    // Remote update arriving while in failed state must never discard unsaved writing.
+    store.applyRemote([{ id: 'p0', index: 0, elements: [] }]);
+    expect(store.getSnapshot().pages[0]?.elements.map((e) => e.id)).toEqual(['stroke1']);
+    vi.useRealTimers();
+  });
+
+  it('regression: keeps newly added pages when a remote update arrives while creation is in flight', () => {
+    let resolveAdd: () => void = () => undefined;
+    const deps: StoreDeps = {
+      save: () => Promise.resolve(),
+      addPage: (index) => ({ id: `new${index}`, done: new Promise<void>((r) => (resolveAdd = r)) }),
+      touch: () => undefined,
+      measure: () => 10,
+      setTimer: (fn, ms) => setTimeout(fn, ms) as unknown as number,
+      clearTimer: (id) => clearTimeout(id),
+      now: () => Date.now(),
+    };
+    const store = new EditorStore(deps);
+    store.applyRemote([{ id: 'p0', index: 0, elements: [] }]);
+
+    const id = store.newPage();
+    // Server snapshot arrives before addPage resolves:
+    store.applyRemote([{ id: 'p0', index: 0, elements: [] }]);
+    expect(store.getSnapshot().pages.map((p) => p.id)).toContain(id);
+
+    resolveAdd();
+    vi.useRealTimers();
+  });
 });
