@@ -42,6 +42,10 @@ export function authErrorMessage(
       return 'auth.error.disabled';
     case 'auth/configuration-not-found':
       return 'auth.error.configurationNotFound';
+    case 'auth/operation-not-allowed':
+      return 'auth.error.operationNotAllowed';
+    case 'auth/unauthorized-domain':
+      return 'auth.error.unauthorizedDomain';
     case 'auth/invalid-api-key':
     case 'auth/api-key-not-valid':
       return 'auth.error.invalidApiKey';

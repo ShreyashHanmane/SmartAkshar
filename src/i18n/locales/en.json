@@ -571,6 +571,8 @@
   "auth.error.popupBlocked": "The sign-in window was blocked. Allow pop-ups for this site and try again.",
   "auth.error.disabled": "This account has been disabled.",
   "auth.error.configurationNotFound": "Firebase Authentication is not enabled for this project yet. Please enable Email/Password, Google, or Anonymous in the Firebase Console under Authentication > Sign-in method.",
+  "auth.error.operationNotAllowed": "Sign-in provider is disabled. Enable Email/Password in your Firebase Console under Authentication > Sign-in method.",
+  "auth.error.unauthorizedDomain": "This domain (smart-akshar.vercel.app) is not authorized. Add it in your Firebase Console under Authentication > Settings > Authorized domains.",
   "auth.error.invalidApiKey": "Firebase API key is invalid or not configured. Please check your Firebase environment variables.",
   "auth.error.recentLogin": "For your security, sign in again and retry."
 }

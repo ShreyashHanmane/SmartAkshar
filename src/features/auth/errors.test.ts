@@ -19,6 +19,12 @@ describe('authErrorMessage', () => {
     expect(authErrorMessage('auth/configuration-not-found', 'signIn')).toBe(
       'auth.error.configurationNotFound',
     );
+    expect(authErrorMessage('auth/operation-not-allowed', 'signUp')).toBe(
+      'auth.error.operationNotAllowed',
+    );
+    expect(authErrorMessage('auth/unauthorized-domain', 'signIn')).toBe(
+      'auth.error.unauthorizedDomain',
+    );
     expect(authErrorMessage('auth/invalid-api-key', 'signIn')).toBe('auth.error.invalidApiKey');
   });
   it('maps server codes to friendly messages', () => {
