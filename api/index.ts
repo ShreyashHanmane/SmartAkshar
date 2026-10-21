@@ -16,3 +16,4 @@ export default async function (req: IncomingMessage, res: ServerResponse) {
   const h = getHandler();
   return h(req, res);
 }
+
