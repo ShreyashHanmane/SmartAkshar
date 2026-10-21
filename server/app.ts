@@ -71,6 +71,9 @@ export function createApp(options: AppOptions): { server: Server; db: Db; hub: E
     try {
       if (url.pathname.startsWith('/api/')) {
         checkCsrf(req);
+        const secure =
+          req.headers['x-forwarded-proto'] === 'https' ||
+          Boolean((req.socket as import('node:tls').TLSSocket)?.encrypted);
         const ctx: Ctx = {
           req,
           res,
@@ -79,7 +82,7 @@ export function createApp(options: AppOptions): { server: Server; db: Db; hub: E
           dataDir: options.dataDir,
           params: {},
           query: url.searchParams,
-          secure: false,
+          secure,
         };
         const image = method === 'GET' ? matchFile(url.pathname) : null;
         if (image) return serveImage(ctx, image);

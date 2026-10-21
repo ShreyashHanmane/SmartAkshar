@@ -30,6 +30,16 @@ describe('accounts', () => {
     ).toBe(200);
   });
 
+  it('clears stale session and returns user: null when user record is gone', async () => {
+    const c = client();
+    const name = uname('del');
+    await c.signUp(name);
+    server.app.db.prepare('DELETE FROM users WHERE username = ?').run(name);
+    const meRes = await c.json('GET', '/api/auth/me');
+    expect(meRes.status).toBe(200);
+    expect(await meRes.json()).toEqual({ user: null });
+  });
+
   it('rejects taken usernames, weak passwords, and bad shapes', async () => {
     const name = uname('dup');
     await client().signUp(name);

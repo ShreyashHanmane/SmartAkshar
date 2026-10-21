@@ -49,7 +49,25 @@ function loadSession(): Promise<void> {
       try {
         publish(await readUser(await request('GET', '/api/auth/me')));
         return;
-      } catch {
+      } catch (err) {
+        // If unauthenticated (401), forbidden (403), or not-found (404),
+        // the visitor is signed out. Never retry client errors or loop.
+        if (err instanceof ApiError && (err.status === 401 || err.status === 403 || err.status === 404)) {
+          publish(null);
+          return;
+        }
+        // Non-ApiError (e.g. malformed HTML body from static host or invalid schema):
+        // do not loop indefinitely.
+        if (!(err instanceof ApiError)) {
+          publish(null);
+          return;
+        }
+        // Server errors (5xx): give up after 3 attempts and treat as signed-out.
+        if (err.status >= 500 && attempt >= 2) {
+          publish(null);
+          return;
+        }
+        // Network failure (server unreachable/starting up): wait and retry.
         await new Promise((r) => setTimeout(r, Math.min(5000, 500 * 2 ** attempt)));
       }
     }
@@ -98,6 +116,7 @@ export function watchAccount(): () => void {
     ['account'],
     (user) => {
       if (user && current && user.uid === current.uid) publish(user);
+      else if (!user && current) publish(null);
     },
     () => undefined,
   );

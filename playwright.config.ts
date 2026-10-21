@@ -24,17 +24,26 @@ export default defineConfig({
   webServer: [
     {
       // Production build served by the real local server, with a fresh data folder (AI off).
-      command: `npm run build && rm -rf .tmp-test/e2e && AKSHAR_DATA_DIR=.tmp-test/e2e PORT=${PORT} node server/index.ts`,
+      command: `npm run build && node -e "const fs=require('fs'); fs.rmSync('.tmp-test/e2e', {recursive:true, force:true});" && node server/index.ts`,
+      env: {
+        AKSHAR_DATA_DIR: '.tmp-test/e2e',
+        PORT: String(PORT),
+      },
       port: PORT,
       reuseExistingServer: false,
       timeout: 120_000,
     },
     {
       // Same app with a scripted AI stand-in (tests/e2e/ai-server.ts) for the AI specs.
-      command: `rm -rf .tmp-test/e2e-ai && AKSHAR_DATA_DIR=.tmp-test/e2e-ai PORT=${AI_PORT} node tests/e2e/ai-server.ts`,
+      command: `node -e "const fs=require('fs'); fs.rmSync('.tmp-test/e2e-ai', {recursive:true, force:true});" && node tests/e2e/ai-server.ts`,
+      env: {
+        AKSHAR_DATA_DIR: '.tmp-test/e2e-ai',
+        PORT: String(AI_PORT),
+      },
       port: AI_PORT,
       reuseExistingServer: false,
       timeout: 120_000,
     },
   ],
 });
+

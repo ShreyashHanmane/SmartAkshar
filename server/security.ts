@@ -46,7 +46,9 @@ export function checkCsrf(req: IncomingMessage) {
   if (req.headers['x-akshar'] !== '1') throw new HttpError(403, 'csrf');
   const origin = req.headers.origin;
   if (origin) {
-    const host = req.headers.host ?? '';
+    const forwarded = req.headers['x-forwarded-host'];
+    const host =
+      (typeof forwarded === 'string' ? forwarded.split(',')[0]?.trim() : null) ?? req.headers.host ?? '';
     if (hostOf(origin) !== host) throw new HttpError(403, 'csrf');
   }
 }

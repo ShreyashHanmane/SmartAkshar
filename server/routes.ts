@@ -122,7 +122,15 @@ function userView(db: Db, uid: string) {
 
 route('GET', '/api/auth/me', (ctx) => {
   const uid = sessionUser(ctx.db, ctx.req);
-  sendJson(ctx.res, 200, { user: uid ? userView(ctx.db, uid) : null });
+  let user = null;
+  if (uid) {
+    try {
+      user = userView(ctx.db, uid);
+    } catch {
+      endSession(ctx.db, ctx.req, ctx.res, ctx.secure);
+    }
+  }
+  sendJson(ctx.res, 200, { user });
 });
 
 route('POST', '/api/auth/signup', async (ctx) => {

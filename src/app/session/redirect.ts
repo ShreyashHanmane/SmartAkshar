@@ -7,7 +7,14 @@ export function safeNextPath(raw: string | null | undefined, fallback = '/'): st
   if (!raw || raw.length > 512) return fallback;
   if (!raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\')) return fallback;
   if (raw.includes('\\') || [...raw].some((ch) => ch.charCodeAt(0) < 0x20)) return fallback;
-  const authPages = ['/login', '/signup'];
-  if (authPages.some((p) => raw === p || raw.startsWith(`${p}?`) || raw.startsWith(`${p}/`))) return fallback;
+  const path = (raw.split(/[?#]/)[0] ?? '').toLowerCase().trim();
+  const authPatterns = ['/login', '/signup', '/auth', '/(auth)'];
+  if (
+    authPatterns.some(
+      (p) => path === p || path.startsWith(`${p}/`) || path.endsWith('/login') || path.endsWith('/signup'),
+    )
+  ) {
+    return fallback;
+  }
   return raw;
 }
