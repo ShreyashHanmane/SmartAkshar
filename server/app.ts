@@ -60,11 +60,15 @@ function serveStatic(distDir: string, pathname: string, res: ServerResponse): bo
   return true;
 }
 
-export function createApp(options: AppOptions): { server: Server; db: Db; hub: EventHub; close: () => void } {
+export function createApiHandler(options: AppOptions): {
+  handle: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+  db: Db;
+  hub: EventHub;
+} {
   const db = openDb(join(options.dataDir, 'akshar.db'));
   const hub = new EventHub();
 
-  const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+  const handle = async (req: IncomingMessage, res: ServerResponse) => {
     setSecurityHeaders(res);
     const url = new URL(req.url ?? '/', 'http://localhost');
     const method = req.method ?? 'GET';
@@ -108,7 +112,14 @@ export function createApp(options: AppOptions): { server: Server; db: Db; hub: E
       options.log?.(`error ${method} ${url.pathname}: ${error instanceof Error ? error.name : 'unknown'}`);
       sendJson(res, 500, { error: 'server' });
     }
-  });
+  };
+
+  return { handle, db, hub };
+}
+
+export function createApp(options: AppOptions): { server: Server; db: Db; hub: EventHub; close: () => void } {
+  const { handle, db, hub } = createApiHandler(options);
+  const server = createServer(handle);
 
   return {
     server,

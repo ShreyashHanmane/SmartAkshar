@@ -77,22 +77,29 @@ function readToken(req: IncomingMessage): string | null {
 /** The signed-in user's id, or null. Extends the session (sliding expiry). */
 export function sessionUser(db: Db, req: IncomingMessage): string | null {
   const token = readToken(req);
-  if (!token || token.length > 100) return null;
-  const hash = sha256(token);
-  const row = db.prepare('SELECT user_id, expires_at FROM sessions WHERE token_hash = ?').get(hash) as
-    { user_id: string; expires_at: number } | undefined;
-  if (!row) return null;
-  const now = Date.now();
-  if (row.expires_at <= now) {
-    db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(hash);
-    return null;
+  if (token && token.length <= 100) {
+    const hash = sha256(token);
+    const row = db.prepare('SELECT user_id, expires_at FROM sessions WHERE token_hash = ?').get(hash) as
+      { user_id: string; expires_at: number } | undefined;
+    if (row) {
+      const now = Date.now();
+      if (row.expires_at <= now) {
+        db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(hash);
+      } else {
+        if (row.expires_at - now < (SESSION_DAYS - 1) * 86_400_000)
+          db.prepare('UPDATE sessions SET expires_at = ? WHERE token_hash = ?').run(
+            now + SESSION_DAYS * 86_400_000,
+            hash,
+          );
+        return row.user_id;
+      }
+    }
   }
-  if (row.expires_at - now < (SESSION_DAYS - 1) * 86_400_000)
-    db.prepare('UPDATE sessions SET expires_at = ? WHERE token_hash = ?').run(
-      now + SESSION_DAYS * 86_400_000,
-      hash,
-    );
-  return row.user_id;
+  const cloudUser = req.headers['x-akshar-user'];
+  if (typeof cloudUser === 'string' && cloudUser.trim()) {
+    return cloudUser.trim();
+  }
+  return null;
 }
 
 export function requireUser(db: Db, req: IncomingMessage): string {

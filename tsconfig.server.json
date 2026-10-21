@@ -17,6 +17,6 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["server", "scripts", "src/shared"],
+  "include": ["server", "scripts", "src/shared", "api"],
   "exclude": ["**/*.test.ts"]
 }

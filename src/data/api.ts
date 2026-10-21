@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import { markReachable } from './events';
+import { getFirebase } from './firebase';
 
 /** Error from the local AKSHAR server (or a network failure: status 0, code "network"). */
 export class ApiError extends Error {
@@ -24,12 +25,19 @@ export async function request(
   let res: Response;
   const timeoutSignal = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(8000) : undefined;
   const signal = init.signal ?? timeoutSignal;
+  let uid: string | undefined;
+  try {
+    uid = getFirebase().auth.currentUser?.uid;
+  } catch {
+    // Auth not initialized yet
+  }
   try {
     res = await fetch(path, {
       method,
       credentials: 'same-origin',
       headers: {
         'X-Akshar': '1',
+        ...(uid ? { 'X-Akshar-User': uid } : {}),
         ...(init.json !== undefined ? { 'Content-Type': 'application/json' } : {}),
         ...init.headers,
       },

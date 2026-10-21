@@ -44,7 +44,7 @@ import {
   endSession,
   hashPassword,
   newId,
-  requireUser,
+  requireUser as baseRequireUser,
   sessionUser,
   verifyPassword,
 } from './auth.ts';
@@ -54,6 +54,23 @@ import { streamExport } from './export.ts';
 import type { EventHub } from './events.ts';
 import { HttpError, noContent, readJson, sendJson, streamToFile } from './http.ts';
 import { RateLimiter } from './security.ts';
+
+function requireUser(db: Db, req: IncomingMessage): string {
+  const uid = baseRequireUser(db, req);
+  const row = db.prepare('SELECT id FROM users WHERE id = ?').get(uid);
+  if (!row) {
+    const nowTimestamp = Date.now();
+    try {
+      db.prepare(
+        'INSERT INTO users (id, username, display_name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)',
+      ).run(uid, `student_${uid.slice(0, 8)}`, 'Student', '', nowTimestamp);
+      addStarterContent(db, uid, nowTimestamp);
+    } catch {
+      // ignore concurrent creation
+    }
+  }
+  return uid;
+}
 
 export interface Ctx {
   req: IncomingMessage;
@@ -1076,6 +1093,16 @@ route('DELETE', '/api/books/:id/highlights/:hid', (ctx) => {
  * is how the app knows the local server is reachable.
  */
 route('GET', '/api/events', (ctx) => {
+  if (process.env.VERCEL) {
+    ctx.res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+    });
+    ctx.res.write('event: ping\ndata: "connected"\n\n');
+    ctx.res.end();
+    return;
+  }
   ctx.hub.add(sessionUser(ctx.db, ctx.req) ?? '', ctx.res);
 });
 
