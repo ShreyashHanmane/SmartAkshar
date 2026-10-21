@@ -14,7 +14,19 @@ export function cleanTitle(title: string): string {
 
 /** Notebooks, most recently edited first. */
 export function subscribeNotebooks(_uid: string, next: (n: Notebook[]) => void, fail: (e: unknown) => void) {
-  return live(() => getJson('/api/notebooks', z.array(notebookSchema)), ['notebooks'], next, fail);
+  return live(
+    async () => {
+      try {
+        return await getJson('/api/notebooks', z.array(notebookSchema));
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 404 || e.status === 0)) return [];
+        throw e;
+      }
+    },
+    ['notebooks'],
+    next,
+    fail,
+  );
 }
 
 export function subscribeNotebook(_uid: string, id: string, next: (n: Notebook | null) => void, fail: (e: unknown) => void) {
@@ -58,8 +70,13 @@ export async function deleteNotebook(_uid: string, id: string): Promise<void> {
 export function subscribeFirstPage(_uid: string, id: string, next: (els: Element[]) => void, fail: (e: unknown) => void) {
   return live(
     async () => {
-      const pages = await getJson(`/api/notebooks/${enc(id)}/pages?first=1`, z.array(z.object({ elements: z.unknown() })));
-      return parseElements(pages[0]?.elements);
+      try {
+        const pages = await getJson(`/api/notebooks/${enc(id)}/pages?first=1`, z.array(z.object({ elements: z.unknown() })));
+        return parseElements(pages[0]?.elements);
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 404 || e.status === 0)) return [];
+        throw e;
+      }
     },
     [`pages:${id}`],
     next,

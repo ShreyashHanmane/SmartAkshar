@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { getJson } from './api';
+import { ApiError, getJson } from './api';
 import { live } from './events';
 
 function endOfToday(now = new Date()): number {
@@ -11,7 +11,14 @@ function endOfToday(now = new Date()): number {
 /** Live count of flashcards due by the end of today. */
 export function subscribeDueCount(_uid: string, next: (count: number) => void, fail: (e: unknown) => void) {
   return live(
-    async () => (await getJson(`/api/cards/due-count?before=${endOfToday()}`, z.object({ count: z.number() }))).count,
+    async () => {
+      try {
+        return (await getJson(`/api/cards/due-count?before=${endOfToday()}`, z.object({ count: z.number() }))).count;
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 404 || e.status === 0)) return 0;
+        throw e;
+      }
+    },
     ['cards', 'decks'],
     next,
     fail,

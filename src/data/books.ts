@@ -23,7 +23,19 @@ export type BookSummary = Book;
 export type Position = z.infer<typeof positionSchema>;
 
 export function subscribeBooks(_uid: string, next: (b: Book[]) => void, fail: (e: unknown) => void, max = 500) {
-  return live(() => getJson(`/api/books?limit=${max}`, z.array(bookSchema)), ['books'], next, fail);
+  return live(
+    async () => {
+      try {
+        return await getJson(`/api/books?limit=${max}`, z.array(bookSchema));
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 404 || e.status === 0)) return [];
+        throw e;
+      }
+    },
+    ['books'],
+    next,
+    fail,
+  );
 }
 
 export function subscribeRecentBooks(uid: string, max: number, next: (b: Book[]) => void, fail: (e: unknown) => void) {
@@ -107,7 +119,19 @@ const highlightSchema = z.object({ id: z.string(), section: z.number().int(), ex
 export type Highlight = z.infer<typeof highlightSchema>;
 
 export function subscribeHighlights(_uid: string, bookId: string, next: (h: Highlight[]) => void, fail: (e: unknown) => void) {
-  return live(() => getJson(`/api/books/${enc(bookId)}/highlights`, z.array(highlightSchema)), [`highlights:${bookId}`], next, fail);
+  return live(
+    async () => {
+      try {
+        return await getJson(`/api/books/${enc(bookId)}/highlights`, z.array(highlightSchema));
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 404 || e.status === 0)) return [];
+        throw e;
+      }
+    },
+    [`highlights:${bookId}`],
+    next,
+    fail,
+  );
 }
 
 /** `section` is the PDF page index, EPUB chapter, or TXT part. */

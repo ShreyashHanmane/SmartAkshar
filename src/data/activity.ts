@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { MAX_FLUSH_SECONDS } from '../shared/schemas';
-import { getJson, send } from './api';
+import { ApiError, getJson, send } from './api';
 import { live } from './events';
 
 export { MAX_FLUSH_SECONDS };
@@ -16,7 +16,14 @@ export function dayKey(date: Date): string {
 
 export function subscribeActivity(_uid: string, fromKey: string, next: (days: ActivityByDay) => void, fail: (e: unknown) => void) {
   return live(
-    () => getJson(`/api/activity?from=${encodeURIComponent(fromKey)}`, z.record(z.string(), z.number().int().min(0))),
+    async () => {
+      try {
+        return await getJson(`/api/activity?from=${encodeURIComponent(fromKey)}`, z.record(z.string(), z.number().int().min(0)));
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 404 || e.status === 0)) return {};
+        throw e;
+      }
+    },
     ['activity'],
     next,
     fail,

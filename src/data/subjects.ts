@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { LIMITS, type Subject, type SubjectColor, subjectSchema } from '../shared/schemas';
-import { getJson, send } from './api';
+import { ApiError, getJson, send } from './api';
 import { live } from './events';
 
 export function cleanSubjectName(name: string): string {
@@ -8,7 +8,19 @@ export function cleanSubjectName(name: string): string {
 }
 
 export function subscribeSubjects(_uid: string, next: (s: Subject[]) => void, fail: (e: unknown) => void) {
-  return live(() => getJson('/api/subjects', z.array(subjectSchema)), ['subjects'], next, fail);
+  return live(
+    async () => {
+      try {
+        return await getJson('/api/subjects', z.array(subjectSchema));
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 404 || e.status === 0)) return [];
+        throw e;
+      }
+    },
+    ['subjects'],
+    next,
+    fail,
+  );
 }
 
 export async function createSubject(_uid: string, name: string, color: SubjectColor): Promise<string> {

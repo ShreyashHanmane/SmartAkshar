@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { endOfDay, startOfDay, type ReviewResult } from '../shared/leitner';
 import { type Card, type Deck, type FlashcardStats, cardSchema, deckSchema, statsSchema } from '../shared/schemas';
-import { getJson, send } from './api';
+import { ApiError, getJson, send } from './api';
 import { live } from './events';
 
 export type { Card, Deck, FlashcardStats };
@@ -9,7 +9,19 @@ const enc = encodeURIComponent;
 const today = () => endOfDay(new Date());
 
 export function subscribeDecks(next: (d: Deck[]) => void, fail: (e: unknown) => void) {
-  return live(() => getJson(`/api/decks?before=${today()}`, z.array(deckSchema)), ['decks'], next, fail);
+  return live(
+    async () => {
+      try {
+        return await getJson(`/api/decks?before=${today()}`, z.array(deckSchema));
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 404 || e.status === 0)) return [];
+        throw e;
+      }
+    },
+    ['decks'],
+    next,
+    fail,
+  );
 }
 
 export async function createDeck(title: string, subjectId: string | null): Promise<string> {
@@ -25,7 +37,19 @@ export async function deleteDeck(id: string) {
 }
 
 export function subscribeCards(deckId: string, next: (c: Card[]) => void, fail: (e: unknown) => void) {
-  return live(() => getJson(`/api/decks/${enc(deckId)}/cards`, z.array(cardSchema)), [`cards:${deckId}`], next, fail);
+  return live(
+    async () => {
+      try {
+        return await getJson(`/api/decks/${enc(deckId)}/cards`, z.array(cardSchema));
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 404 || e.status === 0)) return [];
+        throw e;
+      }
+    },
+    [`cards:${deckId}`],
+    next,
+    fail,
+  );
 }
 
 export async function createCard(deckId: string, front: string, back: string): Promise<string> {
@@ -55,7 +79,16 @@ export function loadCards(deckId: string): Promise<Card[]> {
 
 export function subscribeStats(next: (s: FlashcardStats) => void, fail: (e: unknown) => void) {
   return live(
-    () => getJson(`/api/flashcards/stats?before=${today()}&since=${startOfDay(new Date())}`, statsSchema),
+    async () => {
+      try {
+        return await getJson(`/api/flashcards/stats?before=${today()}&since=${startOfDay(new Date())}`, statsSchema);
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 404 || e.status === 0)) {
+          return { total: 0, dueToday: 0, reviewedToday: 0, boxes: [0, 0, 0, 0, 0] };
+        }
+        throw e;
+      }
+    },
     ['cards', 'decks'],
     next,
     fail,
