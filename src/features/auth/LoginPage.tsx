@@ -1,46 +1,58 @@
 import { type FormEvent, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { signIn } from '../../data/auth';
+import { Link, useNavigate } from 'react-router-dom';
+import { continueAsGuest, signInWithEmail, signInWithGoogle } from '../../data/auth';
 import { t, tDynamic } from '../../i18n/i18n';
 import { Alert } from '../../ui/Alert';
 import { Button } from '../../ui/Button';
 import { TextField } from '../../ui/TextField';
-import { useServerReachable } from '../../ui/useOnline';
-import { AuthLayout } from './AuthLayout';
+import { useOnline } from '../../ui/useOnline';
+import { useNextPath } from '../../app/session/Guards';
+import { useSession } from '../../app/session/SessionProvider';
+import { AuthLayout, OrDivider } from './AuthLayout';
+import { GoogleButton } from './GoogleButton';
 import { fieldErrors, loginSchema } from './schemas';
 import { useAuthAction } from './useAuthAction';
 
 export function LoginPage() {
-  const online = useServerReachable();
+  const session = useSession();
+  const online = useOnline();
   const { busy, error, run } = useAuthAction();
-  const [username, setUsername] = useState('');
+  const navigate = useNavigate();
+  const next = useNextPath();
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fields, setFields] = useState<Record<string, string>>({});
-  const [forgot, setForgot] = useState(false);
+  const isGuest = session.status === 'signedIn' && session.user.isGuest;
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    const parsed = loginSchema.safeParse({ username, password });
+    const parsed = loginSchema.safeParse({ email, password });
     if (!parsed.success) {
       setFields(fieldErrors(parsed.error));
       return;
     }
     setFields({});
-    await run('login', 'signIn', () => signIn(parsed.data.username, parsed.data.password));
+    await run('email', 'signIn', () => signInWithEmail(parsed.data.email, parsed.data.password));
+  }
+
+  // Guests may stay on auth pages (to sign in elsewhere), so move on explicitly.
+  async function onGuest() {
+    if (await run('guest', 'other', continueAsGuest)) navigate(next, { replace: true });
   }
 
   return (
     <AuthLayout title={t('auth.login.title')} subtitle={t('auth.login.subtitle')}>
+      {isGuest && <Alert tone="info">{t('auth.login.guestWarning')}</Alert>}
       {error && <Alert tone="error">{error}</Alert>}
-      <form noValidate onSubmit={onSubmit} className="flex flex-col gap-4">
+      <form noValidate onSubmit={(e) => void onSubmit(e)} className="flex flex-col gap-4">
         <TextField
-          label={t('auth.username')}
-          autoComplete="username"
-          autoCapitalize="none"
-          spellCheck={false}
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          error={tDynamic(fields.username)}
+          label={t('auth.email')}
+          type="email"
+          autoComplete="email"
+          inputMode="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          error={tDynamic(fields.email)}
           required
         />
         <TextField
@@ -52,26 +64,36 @@ export function LoginPage() {
           error={tDynamic(fields.password)}
           required
         />
-        <button
-          type="button"
-          onClick={() => setForgot((v) => !v)}
-          aria-expanded={forgot}
+        <Link
+          to="/forgot-password"
           className="self-end text-sm font-semibold text-accent underline-offset-2 hover:underline"
         >
           {t('auth.login.forgot')}
-        </button>
-        {forgot && (
-          <Alert tone="info">
-            {t('auth.login.forgotHint')}{' '}
-            <code className="font-mono">
-              npm run reset-password -- {username || t('auth.usernamePlaceholder')}
-            </code>
-          </Alert>
-        )}
-        <Button type="submit" block loading={busy === 'login'} disabled={!online || busy !== null}>
+        </Link>
+        <Button type="submit" block loading={busy === 'email'} disabled={!online || busy !== null}>
           {t('auth.login.submit')}
         </Button>
       </form>
+      <OrDivider />
+      <GoogleButton
+        loading={busy === 'google'}
+        disabled={!online || busy !== null}
+        onClick={() => void run('google', 'signIn', signInWithGoogle)}
+      />
+      {!isGuest && (
+        <div className="flex flex-col gap-1">
+          <Button
+            variant="ghost"
+            block
+            loading={busy === 'guest'}
+            disabled={!online || busy !== null}
+            onClick={() => void onGuest()}
+          >
+            {t('auth.guest')}
+          </Button>
+          <p className="text-center text-xs text-ink-muted">{t('auth.guestHint')}</p>
+        </div>
+      )}
       <p className="text-center text-sm text-ink-muted">
         {t('auth.login.noAccount')}{' '}
         <Link to="/signup" className="font-semibold text-accent underline-offset-2 hover:underline">

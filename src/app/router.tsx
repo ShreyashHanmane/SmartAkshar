@@ -1,6 +1,8 @@
 import { createBrowserRouter } from 'react-router-dom';
+import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage';
 import { LoginPage } from '../features/auth/LoginPage';
 import { SignUpPage } from '../features/auth/SignUpPage';
+import { VerifyEmailPage } from '../features/auth/VerifyEmailPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { NotebooksPage } from '../features/notebooks/NotebooksPage';
 import { SearchPage } from '../features/search/SearchPage';
@@ -14,7 +16,7 @@ import { SettingsPage } from '../features/settings/SettingsPage';
 import { WhiteboardPage } from '../features/whiteboard/WhiteboardPage';
 import { NotFoundPage } from './NotFoundPage';
 import { RouteErrorPage } from './RouteErrorPage';
-import { PublicAuthOnly, RequireSession } from './session/Guards';
+import { PublicAuthOnly, RequireSession, VerifyOnly } from './session/Guards';
 import { AppShell } from './shell/AppShell';
 
 export const router = createBrowserRouter([
@@ -32,9 +34,25 @@ export const router = createBrowserRouter([
       {
         path: '/signup',
         element: (
-          <PublicAuthOnly>
+          <PublicAuthOnly signUp>
             <SignUpPage />
           </PublicAuthOnly>
+        ),
+      },
+      {
+        path: '/forgot-password',
+        element: (
+          <PublicAuthOnly>
+            <ForgotPasswordPage />
+          </PublicAuthOnly>
+        ),
+      },
+      {
+        path: '/verify-email',
+        element: (
+          <VerifyOnly>
+            <VerifyEmailPage />
+          </VerifyOnly>
         ),
       },
       {

@@ -1,162 +1,281 @@
-import { type User, userSchema } from '../shared/schemas';
-import { ApiError, apiErrorCode, request, send } from './api';
-import { closeEvents, live } from './events';
-
-/** The app's view of the signed-in person. */
-export interface SessionUser {
-  uid: string;
-  username: string;
-  displayName: string;
-  /** The user's own profile photo (served only to them), or null. */
-  avatarUrl: string | null;
-}
-
-const toSession = (u: User): SessionUser => ({
-  uid: u.id,
-  username: u.username,
-  displayName: u.displayName,
-  avatarUrl: u.avatarUrl,
-});
-
-let current: SessionUser | null | undefined;
-const listeners = new Set<(u: SessionUser | null) => void>();
-
-function publish(user: SessionUser | null) {
-  current = user;
-  for (const l of listeners) l(user);
-}
-
-async function readUser(res: Response): Promise<SessionUser | null> {
-  const body = (await res.json()) as { user: unknown };
-  return body.user ? toSession(userSchema.parse(body.user)) : null;
-}
-
-/**
- * Calls back with the session (null when signed out). The first answer comes
- * from the server; if the server can't be reached it retries until it can.
- */
-export function observeSession(callback: (user: SessionUser | null) => void): () => void {
-  listeners.add(callback);
-  if (current !== undefined) callback(current);
-  else void loadSession();
-  return () => listeners.delete(callback);
-}
-
-let loading: Promise<void> | null = null;
-function loadSession(): Promise<void> {
-  loading ??= (async () => {
-    for (let attempt = 0; ; attempt++) {
-      try {
-        publish(await readUser(await request('GET', '/api/auth/me')));
-        return;
-      } catch (err) {
-        // If unauthenticated (401), forbidden (403), or not-found (404),
-        // the visitor is signed out. Never retry client errors or loop.
-        if (err instanceof ApiError && (err.status === 401 || err.status === 403 || err.status === 404)) {
-          publish(null);
-          return;
-        }
-        // Non-ApiError (e.g. malformed HTML body from static host or invalid schema):
-        // do not loop indefinitely.
-        if (!(err instanceof ApiError)) {
-          publish(null);
-          return;
-        }
-        // Server errors (5xx): give up after 3 attempts and treat as signed-out.
-        if (err.status >= 500 && attempt >= 2) {
-          publish(null);
-          return;
-        }
-        // Network failure (server unreachable/starting up): wait and retry.
-        await new Promise((r) => setTimeout(r, Math.min(5000, 500 * 2 ** attempt)));
-      }
-    }
-  })().finally(() => {
-    loading = null;
-  });
-  return loading;
-}
-
-export async function signIn(username: string, password: string): Promise<void> {
-  publish(await readUser(await request('POST', '/api/auth/login', { json: { username, password } })));
-}
-
-export async function signUp(name: string, username: string, password: string): Promise<void> {
-  publish(await readUser(await request('POST', '/api/auth/signup', { json: { name, username, password } })));
-}
-
-export async function changePassword(current: string, next: string): Promise<void> {
-  await send('POST', '/api/auth/password', { current, next });
-}
-
-export async function updateDisplayName(displayName: string): Promise<void> {
-  publish(await readUser(await request('PATCH', '/api/account', { json: { displayName } })));
-}
-
-/** Uploads a profile photo (the app sends a small square PNG or JPEG). */
-export async function uploadAvatar(file: Blob, ext: 'png' | 'jpg'): Promise<void> {
-  publish(
-    await readUser(
-      await request('POST', '/api/account/avatar', {
-        body: file,
-        headers: { 'Content-Type': 'application/octet-stream', 'X-File-Name': `photo.${ext}` },
-      }),
-    ),
-  );
-}
-
-export async function removeAvatar(): Promise<void> {
-  publish(await readUser(await request('DELETE', '/api/account/avatar')));
-}
-
-/** Keeps the session's name and photo current when they change in another tab. */
-export function watchAccount(): () => void {
-  return live(
-    async () => readUser(await request('GET', '/api/auth/me')),
-    ['account'],
-    (user) => {
-      if (user && current && user.uid === current.uid) publish(user);
-      else if (!user && current) publish(null);
-    },
-    () => undefined,
-  );
-}
-
-export async function deleteAccount(password: string): Promise<void> {
-  await send('POST', '/api/account/delete', { password });
-  await clearLocalData();
-  publish(null);
-}
+import {
+  type User,
+  EmailAuthProvider,
+  GoogleAuthProvider,
+  createUserWithEmailAndPassword,
+  deleteUser,
+  linkWithCredential,
+  linkWithPopup,
+  onIdTokenChanged,
+  reauthenticateWithCredential,
+  reload,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  signInAnonymously,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signOut,
+  updatePassword,
+  updateProfile,
+} from 'firebase/auth';
+import { ApiError } from './api';
+import { getFirebase } from './firebase';
 
 export const LOCAL_KEY_PREFIX = 'akshar:';
 
-async function clearLocalData() {
-  closeEvents();
-  if ('caches' in window) {
-    const keys = await caches.keys();
-    await Promise.all(keys.map((key) => caches.delete(key)));
-  }
-  for (const storage of [window.localStorage, window.sessionStorage]) {
-    for (const key of Object.keys(storage)) if (key.startsWith(LOCAL_KEY_PREFIX)) storage.removeItem(key);
+/** The app's view of the signed-in person. UI code never sees the raw Firebase User object. */
+export interface SessionUser {
+  uid: string;
+  email: string | null;
+  displayName: string;
+  photoURL: string | null;
+  isGuest: boolean;
+  emailVerified: boolean;
+  /** True for password accounts that still need to verify their email. */
+  needsVerification: boolean;
+  providers: string[];
+  /** UI compatibility aliases */
+  username: string;
+  avatarUrl: string | null;
+}
+
+export function toSessionUser(user: User): SessionUser {
+  const providers = user.providerData.map((p) => p.providerId);
+  const isGuest = user.isAnonymous;
+  const passwordOnly = providers.length > 0 && providers.every((p) => p === 'password');
+  const storedAvatar =
+    typeof window !== 'undefined'
+      ? window.localStorage.getItem(`${LOCAL_KEY_PREFIX}avatar:${user.uid}`)
+      : null;
+  const photo = storedAvatar ?? user.photoURL ?? null;
+  const fallbackName = user.email ? (user.email.split('@')[0] ?? 'User') : 'Guest';
+  const displayName = user.displayName?.trim() || fallbackName;
+
+  return {
+    uid: user.uid,
+    email: user.email,
+    displayName,
+    photoURL: photo,
+    isGuest,
+    emailVerified: user.emailVerified,
+    needsVerification: !isGuest && passwordOnly && !user.emailVerified,
+    providers,
+    username: user.email ? (user.email.split('@')[0] ?? fallbackName) : fallbackName,
+    avatarUrl: photo,
+  };
+}
+
+let currentSession: SessionUser | null | undefined;
+const listeners = new Set<(user: SessionUser | null) => void>();
+
+function publish(user: SessionUser | null) {
+  currentSession = user;
+  for (const listener of listeners) {
+    listener(user);
   }
 }
 
 /**
- * Signs out and removes everything this browser cached for the user (Cache
- * Storage, app keys in local/session storage), so a shared computer doesn't
- * leak data. Callers then do a full page navigation.
+ * Uses onIdTokenChanged: it fires when signed in, signed out, when a guest
+ * is upgraded in place (same uid), and after profile/verification refreshes.
  */
-export async function signOutAndClear(): Promise<void> {
+export function observeSession(callback: (user: SessionUser | null) => void): () => void {
+  listeners.add(callback);
+  if (currentSession !== undefined) {
+    callback(currentSession);
+  }
+
+  const unsubscribe = onIdTokenChanged(getFirebase().auth, (user) => {
+    publish(user ? toSessionUser(user) : null);
+  });
+
+  return () => {
+    listeners.delete(callback);
+    unsubscribe();
+  };
+}
+
+export function watchAccount(): () => void {
+  // Firebase onIdTokenChanged notifies across tabs automatically.
+  return () => undefined;
+}
+
+function currentUser(): User | null {
+  return getFirebase().auth.currentUser;
+}
+
+function verificationSettings() {
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173';
+  return { url: `${origin}/verify-email`, handleCodeInApp: false };
+}
+
+export async function signInWithEmail(email: string, password: string): Promise<void> {
+  const res = await signInWithEmailAndPassword(getFirebase().auth, email, password);
+  publish(toSessionUser(res.user));
+}
+
+/**
+ * Creates a password account. When a guest is signed in, the guest account is
+ * upgraded in place (same uid), so all guest notes and data are kept.
+ */
+export async function signUpWithEmail(name: string, email: string, password: string): Promise<void> {
+  const { auth } = getFirebase();
+  const guest = currentUser();
+  const user =
+    guest?.isAnonymous === true
+      ? (await linkWithCredential(guest, EmailAuthProvider.credential(email, password))).user
+      : (await createUserWithEmailAndPassword(auth, email, password)).user;
+  await updateProfile(user, { displayName: name });
+  await sendEmailVerification(user, verificationSettings());
+  await reload(user);
+  await user.getIdToken(true);
+  publish(toSessionUser(user));
+}
+
+/** Google sign-in. A signed-in guest is upgraded in place (same uid). */
+export async function signInWithGoogle(): Promise<void> {
+  const { auth } = getFirebase();
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  const guest = currentUser();
+  if (guest?.isAnonymous) {
+    const { user } = await linkWithPopup(guest, provider);
+    await reload(user);
+    await user.getIdToken(true);
+    publish(toSessionUser(user));
+    return;
+  }
+  const res = await signInWithPopup(auth, provider);
+  publish(toSessionUser(res.user));
+}
+
+export async function continueAsGuest(): Promise<void> {
+  const res = await signInAnonymously(getFirebase().auth);
+  publish(toSessionUser(res.user));
+}
+
+export async function requestPasswordReset(email: string): Promise<void> {
   try {
-    await send('POST', '/api/auth/logout');
-  } finally {
-    await clearLocalData();
-    publish(null);
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173';
+    await sendPasswordResetEmail(getFirebase().auth, email, { url: `${origin}/login` });
+  } catch (error) {
+    // Never reveal whether an account exists for this email.
+    if (authErrorCode(error) === 'auth/user-not-found') return;
+    throw error;
   }
 }
 
+export async function resendVerificationEmail(): Promise<void> {
+  const user = currentUser();
+  if (!user) throw new Error('Not signed in');
+  await sendEmailVerification(user, verificationSettings());
+}
+
+/** Reloads the user from Firebase and returns the fresh session (e.g. after verifying email). */
+export async function refreshSession(): Promise<SessionUser | null> {
+  const user = currentUser();
+  if (!user) return null;
+  await reload(user);
+  await user.getIdToken(true);
+  const session = toSessionUser(user);
+  publish(session);
+  return session;
+}
+
+export async function updateDisplayName(displayName: string): Promise<void> {
+  const user = currentUser();
+  if (!user) throw new Error('Not signed in');
+  await updateProfile(user, { displayName });
+  await reload(user);
+  await user.getIdToken(true);
+  publish(toSessionUser(user));
+}
+
+export async function uploadAvatar(file: Blob, _ext: 'png' | 'jpg'): Promise<void> {
+  const user = currentUser();
+  if (!user) throw new Error('Not signed in');
+
+  const reader = new FileReader();
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(`${LOCAL_KEY_PREFIX}avatar:${user.uid}`, dataUrl);
+  }
+
+  // Update profile photo if within size limit
+  if (dataUrl.length <= 2048) {
+    await updateProfile(user, { photoURL: dataUrl }).catch(() => undefined);
+  }
+  publish(toSessionUser(user));
+}
+
+export async function removeAvatar(): Promise<void> {
+  const user = currentUser();
+  if (!user) throw new Error('Not signed in');
+  if (typeof window !== 'undefined') {
+    window.localStorage.removeItem(`${LOCAL_KEY_PREFIX}avatar:${user.uid}`);
+  }
+  await updateProfile(user, { photoURL: null }).catch(() => undefined);
+  publish(toSessionUser(user));
+}
+
+export async function changePassword(current: string, next: string): Promise<void> {
+  const user = currentUser();
+  if (!user || !user.email) throw new Error('Not signed in');
+  const cred = EmailAuthProvider.credential(user.email, current);
+  await reauthenticateWithCredential(user, cred);
+  await updatePassword(user, next);
+}
+
+export async function deleteAccount(password: string): Promise<void> {
+  const user = currentUser();
+  if (!user) throw new Error('Not signed in');
+  if (user.email && password) {
+    const cred = EmailAuthProvider.credential(user.email, password);
+    await reauthenticateWithCredential(user, cred);
+  }
+  await deleteUser(user);
+  await signOutAndClear();
+}
+
+/**
+ * Signs out and removes everything this device cached for the user, so a shared
+ * device does not leak data. Callers should then do a full page navigation.
+ */
+export async function signOutAndClear(): Promise<void> {
+  const { auth } = getFirebase();
+  await signOut(auth);
+  if (typeof window !== 'undefined') {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((key) => caches.delete(key)));
+    }
+    for (const storage of [window.localStorage, window.sessionStorage]) {
+      for (const key of Object.keys(storage)) {
+        if (key.startsWith(LOCAL_KEY_PREFIX)) storage.removeItem(key);
+      }
+    }
+  }
+  publish(null);
+}
+
 export function authErrorCode(error: unknown): string | undefined {
-  return apiErrorCode(error);
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    const code = (error as { code: unknown }).code;
+    return typeof code === 'string' ? code : undefined;
+  }
+  return undefined;
+}
+
+/** Backward-compatibility aliases for local server callers */
+export const signIn = signInWithEmail;
+export async function signUp(name: string, emailOrUsername: string, password: string): Promise<void> {
+  const email = emailOrUsername.includes('@') ? emailOrUsername : `${emailOrUsername}@example.com`;
+  await signUpWithEmail(name, email, password);
 }
 
 export { ApiError };
