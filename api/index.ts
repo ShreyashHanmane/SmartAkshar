@@ -1,5 +1,15 @@
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { z } from 'zod';
+import {
+  AI_DAILY_LIMIT,
+  aiCardSchema,
+  aiRequestSchema,
+} from '../src/shared/schemas.ts';
+import { GeminiProvider } from '../server/ai/gemini.ts';
+import { SYSTEM, buildPrompt, cleanOutput } from '../server/ai/prompts.ts';
+import { AiProviderError } from '../server/ai/provider.ts';
 
 interface Subject {
   id: string;
@@ -71,6 +81,7 @@ interface UserStore {
   decks: Deck[];
   cards: Record<string, Card[]>; // deckId -> cards
   books: Book[];
+  aiUsage?: Record<string, number>; // day -> count
 }
 
 const STORE_PATH = '/tmp/akshar_store.json';
@@ -117,11 +128,14 @@ function getInitialStore(): UserStore {
       theme: 'light',
       font: 'sans',
       fontSize: 'medium',
+      textSize: 'md',
+      toolbarSide: 'left',
       language: 'en',
       locale: 'en',
       weeklyGoalHours: 10,
     },
     activity: {},
+    aiUsage: {},
     subjects: [subPhys, subMath, subChem, subHist],
     notebooks: [],
     pages: {},
@@ -166,9 +180,14 @@ function persistStore(uid: string, store: UserStore) {
   }
 }
 
-async function readBody(req: IncomingMessage): Promise<unknown> {
+async function readBody(req: IncomingMessage, maxBytes = 2_200_000): Promise<unknown> {
   const chunks: Buffer[] = [];
+  let bytes = 0;
   for await (const chunk of req) {
+    bytes += (chunk as Buffer).length;
+    if (bytes > maxBytes) {
+      throw new Error('payload-too-large');
+    }
     chunks.push(chunk as Buffer);
   }
   const text = Buffer.concat(chunks).toString('utf8');
@@ -178,6 +197,51 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
   } catch {
     return {};
   }
+}
+
+class BurstLimiter {
+  private hits = new Map<string, { count: number; reset: number }>();
+  private max: number;
+  private windowMs: number;
+  constructor(max: number, windowMs: number) {
+    this.max = max;
+    this.windowMs = windowMs;
+  }
+  take(key: string, now = Date.now()): boolean {
+    const entry = this.hits.get(key);
+    if (!entry || entry.reset <= now) {
+      this.hits.set(key, { count: 1, reset: now + this.windowMs });
+      return true;
+    }
+    entry.count++;
+    return entry.count <= this.max;
+  }
+}
+
+const aiBurstLimiter = new BurstLimiter(5, 60_000);
+
+function abortOnClose(req: IncomingMessage): AbortSignal {
+  const controller = new AbortController();
+  req.socket?.once('close', () => controller.abort());
+  return controller.signal;
+}
+
+function parseCards(text: string) {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, ''));
+  } catch {
+    return [];
+  }
+  return z
+    .array(z.unknown())
+    .catch([])
+    .parse(raw)
+    .flatMap((c) => {
+      const parsed = aiCardSchema.safeParse(c);
+      return parsed.success ? [parsed.data] : [];
+    })
+    .slice(0, 10);
 }
 
 function sendJson(res: ServerResponse, status: number, data: unknown) {
@@ -583,15 +647,136 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       });
     }
 
-    // 12. AI status
+    // 12. AI status & run
     if (pathname === '/api/ai/status') {
-      return sendJson(res, 200, { configured: Boolean(process.env.GEMINI_API_KEY) });
+      if (method !== 'GET') {
+        return sendJson(res, 405, { error: 'method-not-allowed' });
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      const usedToday = store.aiUsage?.[today] ?? 0;
+      const key = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY)?.trim();
+      return sendJson(res, 200, {
+        enabled: Boolean(key),
+        limit: AI_DAILY_LIMIT,
+        used: usedToday,
+      });
+    }
+
+    if (pathname === '/api/ai/run') {
+      if (method !== 'POST') {
+        return sendJson(res, 405, { error: 'method-not-allowed' });
+      }
+
+      // Check CSRF
+      if (req.headers['x-akshar'] !== '1') {
+        return sendJson(res, 403, { error: 'csrf' });
+      }
+
+      // Check authentication (requires X-Akshar-User or cookie)
+      if (!req.headers['x-akshar-user'] && !req.headers.cookie) {
+        return sendJson(res, 401, { error: 'unauthorized' });
+      }
+
+      const key = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY)?.trim();
+      if (!key) {
+        return sendJson(res, 503, { error: 'ai-disabled' });
+      }
+
+      // Burst rate limiter: max 5 requests per 60 seconds
+      if (!aiBurstLimiter.take(uid)) {
+        return sendJson(res, 429, { error: 'rate-limited' });
+      }
+
+      // Daily quota: max 20 requests per day
+      const today = new Date().toISOString().slice(0, 10);
+      store.aiUsage = store.aiUsage ?? {};
+      const usedToday = store.aiUsage[today] ?? 0;
+      if (usedToday >= AI_DAILY_LIMIT) {
+        return sendJson(res, 429, { error: 'quota' });
+      }
+
+      // Validate request body
+      const rawBody = await readBody(req, 2_200_000);
+      const parsedBody = aiRequestSchema.safeParse(rawBody);
+      if (!parsedBody.success) {
+        return sendJson(res, 400, { error: 'invalid' });
+      }
+      const body = parsedBody.data;
+
+      // Reserve quota
+      store.aiUsage[today] = usedToday + 1;
+      persistStore(uid, store);
+
+      const model = process.env.GEMINI_MODEL?.trim() || 'gemini-3.5-flash';
+      const provider = new GeminiProvider(key, model);
+      const signal = AbortSignal.any([
+        AbortSignal.timeout(25_000),
+        abortOnClose(req),
+      ]);
+
+      const started = Date.now();
+      let status = 'ok';
+      let detail: string | undefined;
+      let tokens: { in?: number; out?: number } = {};
+
+      try {
+        const out = await provider.generate({
+          system: SYSTEM,
+          prompt: buildPrompt(body),
+          imagePng: body.image?.slice('data:image/png;base64,'.length),
+          json: body.action === 'flashcards',
+          maxOutputTokens: body.action === 'flashcards' ? 1500 : 1024,
+          signal,
+        });
+
+        tokens = { in: out.inputTokens, out: out.outputTokens };
+
+        if (body.action === 'flashcards') {
+          const cards = parseCards(out.text);
+          if (cards.length === 0) {
+            throw new AiProviderError('provider');
+          }
+          return sendJson(res, 200, { text: '', cards });
+        }
+        return sendJson(res, 200, { text: cleanOutput(out.text) });
+      } catch (error) {
+        // Refund quota on failure
+        store.aiUsage[today] = Math.max(0, (store.aiUsage[today] ?? 1) - 1);
+        persistStore(uid, store);
+
+        status = error instanceof AiProviderError ? error.code : 'error';
+        if (error instanceof AiProviderError) detail = error.detail;
+
+        if (error instanceof AiProviderError) {
+          const statusCode = error.code === 'timeout' ? 504 : error.code === 'blocked' ? 422 : 502;
+          return sendJson(res, statusCode, { error: `ai-${error.code}` });
+        }
+        return sendJson(res, 500, { error: 'server' });
+      } finally {
+        // Metadata only: never the prompt, answer, or key
+        const hashed = createHash('sha256').update(uid).digest('hex').slice(0, 12);
+        console.log(
+          JSON.stringify({
+            event: 'ai',
+            user: hashed,
+            action: body.action,
+            status,
+            detail,
+            ms: Date.now() - started,
+            tokensIn: tokens.in,
+            tokensOut: tokens.out,
+          }),
+        );
+      }
     }
 
     // Default fallback: 200 OK with empty object to prevent breaking UI
     return sendJson(res, 200, {});
   } catch (error) {
+    if (error instanceof Error && error.message === 'payload-too-large') {
+      return sendJson(res, 413, { error: 'payload-too-large' });
+    }
     console.error('API Error:', error);
-    return sendJson(res, 200, {});
+    return sendJson(res, 500, { error: 'server' });
   }
 }
