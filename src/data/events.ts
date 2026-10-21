@@ -28,6 +28,10 @@ function ensureSource() {
   source.onerror = () => {
     wasDisconnected = true;
     setConnected(false);
+    if (source && source.readyState === 2) {
+      source.close();
+      source = null;
+    }
   };
   source.onmessage = (event) => {
     let topic: unknown;

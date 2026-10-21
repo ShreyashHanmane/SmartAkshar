@@ -104,20 +104,11 @@ function currentUser(): User | null {
   return getFirebase().auth.currentUser;
 }
 
-function verificationSettings() {
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173';
-  return { url: `${origin}/verify-email`, handleCodeInApp: false };
-}
-
 export async function signInWithEmail(email: string, password: string): Promise<void> {
   const res = await signInWithEmailAndPassword(getFirebase().auth, email, password);
   publish(toSessionUser(res.user));
 }
 
-/**
- * Creates a password account. When a guest is signed in, the guest account is
- * upgraded in place (same uid), so all guest notes and data are kept.
- */
 export async function signUpWithEmail(name: string, email: string, password: string): Promise<void> {
   const { auth } = getFirebase();
   const guest = currentUser();
@@ -126,9 +117,13 @@ export async function signUpWithEmail(name: string, email: string, password: str
       ? (await linkWithCredential(guest, EmailAuthProvider.credential(email, password))).user
       : (await createUserWithEmailAndPassword(auth, email, password)).user;
   await updateProfile(user, { displayName: name });
-  await sendEmailVerification(user, verificationSettings());
-  await reload(user);
-  await user.getIdToken(true);
+  try {
+    await sendEmailVerification(user);
+  } catch (err) {
+    if (import.meta.env.DEV) console.warn('Could not send verification email:', err);
+  }
+  await reload(user).catch(() => undefined);
+  await user.getIdToken(true).catch(() => undefined);
   publish(toSessionUser(user));
 }
 
@@ -140,8 +135,8 @@ export async function signInWithGoogle(): Promise<void> {
   const guest = currentUser();
   if (guest?.isAnonymous) {
     const { user } = await linkWithPopup(guest, provider);
-    await reload(user);
-    await user.getIdToken(true);
+    await reload(user).catch(() => undefined);
+    await user.getIdToken(true).catch(() => undefined);
     publish(toSessionUser(user));
     return;
   }
@@ -156,8 +151,7 @@ export async function continueAsGuest(): Promise<void> {
 
 export async function requestPasswordReset(email: string): Promise<void> {
   try {
-    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173';
-    await sendPasswordResetEmail(getFirebase().auth, email, { url: `${origin}/login` });
+    await sendPasswordResetEmail(getFirebase().auth, email);
   } catch (error) {
     // Never reveal whether an account exists for this email.
     if (authErrorCode(error) === 'auth/user-not-found') return;
@@ -168,7 +162,7 @@ export async function requestPasswordReset(email: string): Promise<void> {
 export async function resendVerificationEmail(): Promise<void> {
   const user = currentUser();
   if (!user) throw new Error('Not signed in');
-  await sendEmailVerification(user, verificationSettings());
+  await sendEmailVerification(user);
 }
 
 /** Reloads the user from Firebase and returns the fresh session (e.g. after verifying email). */
