@@ -2,17 +2,17 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getAnalytics } from 'firebase/analytics';
 
-const apiKey = import.meta.env.VITE_FIREBASE_API_KEY || 'demo-api-key';
-const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'demo-akshar';
+const apiKey = import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyC6g0EfYCc0InJcAHC6WHmkV09auQlIAsw';
+const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'akshar-study';
 
 const firebaseConfig = {
   apiKey,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || `${projectId}.firebaseapp.com`,
   projectId,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || `${projectId}.appspot.com`,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || 'demo-app-id',
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || `${projectId}.firebasestorage.app`,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '457903052317',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:457903052317:web:a62d755e898bba4a8098f4',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || 'G-4ST8ZLNMF5',
 };
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);

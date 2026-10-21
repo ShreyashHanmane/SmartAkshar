@@ -22,6 +22,8 @@ export async function request(
   init: { json?: unknown; body?: BodyInit; headers?: Record<string, string>; signal?: AbortSignal } = {},
 ): Promise<Response> {
   let res: Response;
+  const timeoutSignal = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(8000) : undefined;
+  const signal = init.signal ?? timeoutSignal;
   try {
     res = await fetch(path, {
       method,
@@ -32,7 +34,7 @@ export async function request(
         ...init.headers,
       },
       body: init.json !== undefined ? JSON.stringify(init.json) : (init.body ?? null),
-      ...(init.signal ? { signal: init.signal } : {}),
+      ...(signal ? { signal } : {}),
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error;

@@ -16,7 +16,10 @@ describe('authErrorMessage', () => {
     expect(authErrorMessage('auth/email-already-in-use', 'signUp')).toBe('auth.error.emailInUse');
   });
   it('maps configuration-not-found error', () => {
-    expect(authErrorMessage('auth/configuration-not-found', 'signIn')).toBe('auth.error.configurationNotFound');
+    expect(authErrorMessage('auth/configuration-not-found', 'signIn')).toBe(
+      'auth.error.configurationNotFound',
+    );
+    expect(authErrorMessage('auth/invalid-api-key', 'signIn')).toBe('auth.error.invalidApiKey');
   });
   it('maps server codes to friendly messages', () => {
     expect(authErrorMessage('invalid-credentials', 'signIn')).toBe('auth.error.invalidCredentials');

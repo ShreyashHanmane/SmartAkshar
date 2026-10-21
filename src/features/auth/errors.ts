@@ -42,6 +42,9 @@ export function authErrorMessage(
       return 'auth.error.disabled';
     case 'auth/configuration-not-found':
       return 'auth.error.configurationNotFound';
+    case 'auth/invalid-api-key':
+    case 'auth/api-key-not-valid':
+      return 'auth.error.invalidApiKey';
     case 'auth/requires-recent-login':
       return 'auth.error.recentLogin';
     case 'username-taken':
