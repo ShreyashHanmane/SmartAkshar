@@ -407,6 +407,7 @@ export function Editor({
         )}
         {editor.loadState === 'ready' && page && (
           <WhiteboardCanvas
+            key={page.id}
             elements={page.elements}
             mode={mode}
             paper={notebook.paper}
