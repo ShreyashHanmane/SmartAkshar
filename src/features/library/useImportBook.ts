@@ -25,7 +25,7 @@ const SERVER_ERRORS: Record<string, MessageKey> = {
  * everything again.
  */
 export function useImportBook(usedBytes: number) {
-  useSignedInUser();
+  const user = useSignedInUser();
   const toast = useToast();
   const [state, setState] = useState<ImportState | null>(null);
   const abort = useRef<AbortController | null>(null);
@@ -64,7 +64,7 @@ export function useImportBook(usedBytes: number) {
     abort.current = controller;
     try {
       await importBook(
-        '',
+        user.uid,
         file,
         { format: check.format, fileName: file.name, ...meta },
         (p) => setState({ name: file.name, progress: p }),

@@ -16,6 +16,8 @@ const limits = { file: 1000, total: 5000, used: 0 };
 describe('sniffBook', () => {
   it('recognises PDF, EPUB, and UTF-8 text', () => {
     expect(sniffBook(enc('%PDF-1.7\n'))).toBe('pdf');
+    expect(sniffBook(new Uint8Array([0xef, 0xbb, 0xbf, 0x25, 0x50, 0x44, 0x46, 0x2d]))).toBe('pdf');
+    expect(sniffBook(enc('  \r\n%PDF-1.5'))).toBe('pdf');
     expect(sniffBook(epubHead())).toBe('epub');
     expect(sniffBook(enc('Chapter 1\nनमस्ते दुनिया'))).toBe('txt');
   });

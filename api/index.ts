@@ -492,8 +492,72 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         return sendJson(res, 200, store.books);
       }
       if (method === 'POST') {
-        return sendJson(res, 201, { id: `b-${Math.random().toString(36).slice(2, 9)}` });
+        const id = `b-${Math.random().toString(36).slice(2, 9)}`;
+        const header = (h: string) => {
+          const v = req.headers[h];
+          if (typeof v !== 'string') return '';
+          try {
+            return decodeURIComponent(v).trim();
+          } catch {
+            return v.trim();
+          }
+        };
+        const rawFileName = header('x-file-name') || 'book.pdf';
+        const format = (rawFileName.toLowerCase().split('.').pop() || 'pdf') as 'pdf' | 'epub' | 'txt';
+        const title = header('x-title') || rawFileName.replace(/\.[^.]+$/, '') || 'Untitled';
+        const author = header('x-author') || null;
+        const pageCount = Number(header('x-page-count')) || 0;
+        const newBook: Book = {
+          id,
+          title,
+          author,
+          format: ['pdf', 'epub', 'txt'].includes(format) ? format : 'pdf',
+          size: Number(req.headers['content-length']) || 0,
+          pageCount,
+          progress: 0,
+          position: {},
+          notebookId: null,
+          openedAt: Date.now(),
+        };
+        store.books.unshift(newBook);
+        persistStore(uid, store);
+        return sendJson(res, 201, { id });
       }
+    }
+    const bookIdMatch = pathname.match(/^\/api\/books\/([^/]+)$/);
+    if (bookIdMatch) {
+      const bookId = decodeURIComponent(bookIdMatch[1] ?? '');
+      const book = store.books.find((b) => b.id === bookId);
+      if (!book) return sendJson(res, 404, { error: 'not-found' });
+      if (method === 'GET') return sendJson(res, 200, book);
+      if (method === 'PATCH') {
+        const body = (await readBody(req)) as Partial<Book>;
+        Object.assign(book, body);
+        persistStore(uid, store);
+        return sendNoContent(res);
+      }
+      if (method === 'DELETE') {
+        store.books = store.books.filter((b) => b.id !== bookId);
+        persistStore(uid, store);
+        return sendNoContent(res);
+      }
+    }
+    const bookFileMatch = pathname.match(/^\/api\/books\/([^/]+)\/file$/);
+    if (bookFileMatch) {
+      const bookId = decodeURIComponent(bookFileMatch[1] ?? '');
+      const book = store.books.find((b) => b.id === bookId);
+      if (!book) return sendJson(res, 404, { error: 'not-found' });
+      res.writeHead(200, {
+        'Content-Type':
+          book.format === 'pdf'
+            ? 'application/pdf'
+            : book.format === 'epub'
+              ? 'application/epub+zip'
+              : 'text/plain',
+        'Content-Disposition': 'attachment',
+      });
+      res.end(Buffer.from(book.format === 'pdf' ? '%PDF-1.7\n%test\n' : 'Book content'));
+      return;
     }
     if (pathname.match(/^\/api\/books\/([^/]+)\/highlights$/)) {
       return sendJson(res, 200, []);

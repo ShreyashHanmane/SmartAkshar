@@ -3,6 +3,7 @@ import { BOOK_MIME, type BookFormat } from '../shared/fileTypes';
 import { positionSchema } from '../shared/schemas';
 import { ApiError, getJson, request, send } from './api';
 import { live } from './events';
+import { getFirebase } from './firebase';
 
 const enc = encodeURIComponent;
 
@@ -57,7 +58,7 @@ export function subscribeBook(_uid: string, id: string, next: (b: Book | null) =
 
 /** Uploads a book with progress (XMLHttpRequest reports upload progress; fetch doesn't). */
 export function importBook(
-  _uid: string,
+  uid: string,
   file: Blob,
   meta: { format: BookFormat; fileName: string; title: string; author: string | null; pageCount: number },
   onProgress: (fraction: number) => void,
@@ -66,7 +67,17 @@ export function importBook(
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/api/books');
+    xhr.withCredentials = true;
     xhr.setRequestHeader('X-Akshar', '1');
+    let effectiveUid = uid;
+    if (!effectiveUid && typeof window !== 'undefined') {
+      try {
+        effectiveUid = getFirebase()?.auth?.currentUser?.uid ?? '';
+      } catch {
+        // Firebase not initialized
+      }
+    }
+    if (effectiveUid) xhr.setRequestHeader('X-Akshar-User', effectiveUid);
     xhr.setRequestHeader('Content-Type', BOOK_MIME[meta.format]);
     xhr.setRequestHeader('X-File-Name', enc(meta.fileName));
     xhr.setRequestHeader('X-Title', enc(meta.title.slice(0, 200)));

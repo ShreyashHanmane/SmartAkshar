@@ -20,7 +20,17 @@ const ascii = (bytes: Uint8Array, start: number, length: number) =>
  * TXT: valid UTF-8 without NUL bytes.
  */
 export function sniffBook(head: Uint8Array): BookFormat | null {
-  if (ascii(head, 0, 5) === '%PDF-') return 'pdf';
+  let offset = 0;
+  if (head.length >= 3 && head[0] === 0xef && head[1] === 0xbb && head[2] === 0xbf) {
+    offset = 3;
+  }
+  while (
+    offset < head.length &&
+    (head[offset] === 0x20 || head[offset] === 0x09 || head[offset] === 0x0a || head[offset] === 0x0d)
+  ) {
+    offset++;
+  }
+  if (ascii(head, offset, 5) === '%PDF-') return 'pdf';
   if (head[0] === 0x50 && head[1] === 0x4b && head[2] === 0x03 && head[3] === 0x04) {
     const nameLength = (head[26] ?? 0) | ((head[27] ?? 0) << 8);
     const extraLength = (head[28] ?? 0) | ((head[29] ?? 0) << 8);

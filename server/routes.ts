@@ -617,8 +617,14 @@ async function receiveFile(ctx: Ctx, uid: string, kind: 'images' | 'books', limi
 
 function fileName(ctx: Ctx): string {
   const raw = ctx.req.headers['x-file-name'];
-  const name = typeof raw === 'string' ? decodeURIComponent(raw).slice(0, 255) : '';
-  if (!name) throw new HttpError(400, 'file-name-required');
+  if (typeof raw !== 'string' || !raw.trim()) throw new HttpError(400, 'file-name-required');
+  let name = '';
+  try {
+    name = decodeURIComponent(raw).slice(0, 255);
+  } catch {
+    name = raw.slice(0, 255);
+  }
+  if (!name.trim()) throw new HttpError(400, 'file-name-required');
   return name;
 }
 
@@ -970,7 +976,12 @@ route('POST', '/api/books', async (ctx) => {
   const name = fileName(ctx);
   const header = (h: string) => {
     const v = ctx.req.headers[h];
-    return typeof v === 'string' ? decodeURIComponent(v).trim() : '';
+    if (typeof v !== 'string') return '';
+    try {
+      return decodeURIComponent(v).trim();
+    } catch {
+      return v.trim();
+    }
   };
   const title =
     header('x-title').slice(0, LIMITS.bookTitle) ||
