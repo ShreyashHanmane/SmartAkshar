@@ -13,8 +13,8 @@ export class ApiError extends Error {
 }
 
 /**
- * Talks to the local server. Every request carries the X-Akshar header (the
- * server's CSRF check) and the HttpOnly session cookie (sent automatically).
+ * Talks to the backend server. Every request carries the X-Akshar header (the
+ * server's CSRF check) and the session cookie (sent automatically).
  */
 export async function request(
   method: string,
@@ -39,27 +39,64 @@ export async function request(
     markReachable(false);
     throw new ApiError(0, 'network');
   }
-  markReachable(true);
+
+  const contentType = res.headers.get('content-type') ?? '';
+  const isHtml = contentType.includes('text/html');
+
   if (!res.ok) {
+    markReachable(false);
     let code = 'server';
-    try {
-      code = ((await res.json()) as { error?: string }).error ?? code;
-    } catch {
-      // Non-JSON error body.
+    if (!isHtml) {
+      try {
+        code = ((await res.json()) as { error?: string }).error ?? code;
+      } catch {
+        // Non-JSON error body.
+      }
     }
     throw new ApiError(res.status, code);
   }
+
+  if (isHtml) {
+    // When deployed statically (e.g. Vercel), catch-all rewrites may return index.html for API paths.
+    // Treat as unreachable server rather than crashing with JSON parse error.
+    markReachable(false);
+    throw new ApiError(res.status, 'network');
+  }
+
+  markReachable(true);
   return res;
 }
 
 export async function getJson<T>(path: string, schema: z.ZodType<T>): Promise<T> {
   const res = await request('GET', path);
-  return schema.parse(await res.json());
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    markReachable(false);
+    throw new ApiError(res.status, 'network');
+  }
+
+  const parsed = schema.safeParse(data);
+  if (!parsed.success) {
+    if (import.meta.env.DEV) {
+      console.warn(`Zod schema mismatch on ${path}:`, parsed.error);
+    }
+    throw new ApiError(res.status, 'invalid');
+  }
+  return parsed.data;
 }
 
 export async function send(method: string, path: string, json?: unknown): Promise<unknown> {
   const res = await request(method, path, json === undefined ? {} : { json });
-  return res.status === 204 ? null : ((await res.json()) as unknown);
+  if (res.status === 204) return null;
+  const contentType = res.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) return null;
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 /** Client-chosen ids (notebooks, pages): random, URL-safe, unguessable. */

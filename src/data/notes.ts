@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { type ImageKind, IMAGE_EXT } from '../shared/images';
 import { isOwnImage } from '../shared/clean';
-import { getJson, request, send } from './api';
+import { ApiError, getJson, request, send } from './api';
 import { live } from './events';
 
 /** Tiptap document JSON (cleaned by cleanContent in the browser and on the server). */
@@ -38,7 +38,10 @@ export async function uploadNoteImage(_uid: string, notebookId: string, file: Bl
     body: file,
     headers: { 'Content-Type': 'application/octet-stream', 'X-File-Name': `image.${IMAGE_EXT[kind]}` },
   });
-  return z.object({ url: z.string() }).parse(await res.json()).url;
+  const body: unknown = await res.json().catch(() => null);
+  const parsed = z.object({ url: z.string() }).safeParse(body);
+  if (!parsed.success) throw new ApiError(res.status, 'invalid');
+  return parsed.data.url;
 }
 
 /** Appends plain-text paragraphs to a notebook's typed notes (used by AI "Insert into notes"). */
