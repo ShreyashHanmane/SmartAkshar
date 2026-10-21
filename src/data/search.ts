@@ -21,19 +21,23 @@ const indexSchema = z.object({
 
 /** A small title index of the user's own items for client-side search. */
 export async function loadSearchIndex(_uid: string): Promise<SearchItem[]> {
-  const index = await getJson('/api/search-index', indexSchema);
-  const subjectNames = new Map(index.subjects.map((s) => [s.id, s.name]));
-  const enc = encodeURIComponent;
-  return [
-    ...index.subjects.map((s) => ({ kind: 'subject' as const, id: s.id, title: s.name, href: `/notebooks?subject=${enc(s.id)}` })),
-    ...index.notebooks.map((n) => ({
-      kind: 'notebook' as const,
-      id: n.id,
-      title: n.title,
-      detail: n.subjectId ? subjectNames.get(n.subjectId) : undefined,
-      href: `/notebooks/${enc(n.id)}`,
-    })),
-    ...index.books.map((b) => ({ kind: 'book' as const, id: b.id, title: b.title, detail: b.author ?? undefined, href: `/library/${enc(b.id)}` })),
-    ...index.decks.map((d) => ({ kind: 'deck' as const, id: d.id, title: d.title, href: `/flashcards/${enc(d.id)}` })),
-  ];
+  try {
+    const index = await getJson('/api/search-index', indexSchema);
+    const subjectNames = new Map(index.subjects.map((s) => [s.id, s.name]));
+    const enc = encodeURIComponent;
+    return [
+      ...index.subjects.map((s) => ({ kind: 'subject' as const, id: s.id, title: s.name, href: `/notebooks?subject=${enc(s.id)}` })),
+      ...index.notebooks.map((n) => ({
+        kind: 'notebook' as const,
+        id: n.id,
+        title: n.title,
+        detail: n.subjectId ? subjectNames.get(n.subjectId) : undefined,
+        href: `/notebooks/${enc(n.id)}`,
+      })),
+      ...index.books.map((b) => ({ kind: 'book' as const, id: b.id, title: b.title, detail: b.author ?? undefined, href: `/library/${enc(b.id)}` })),
+      ...index.decks.map((d) => ({ kind: 'deck' as const, id: d.id, title: d.title, href: `/flashcards/${enc(d.id)}` })),
+    ];
+  } catch {
+    return [];
+  }
 }

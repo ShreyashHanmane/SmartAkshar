@@ -401,7 +401,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     if (noteMatch) {
       const nbId = decodeURIComponent(noteMatch[1] ?? '');
       if (method === 'GET') {
-        return sendJson(res, 200, store.notes[nbId] ?? null);
+        const content = (store.notes[nbId] as Record<string, unknown> | null | undefined) ?? null;
+        return sendJson(res, 200, { content, updatedAt: Date.now() });
       }
       if (method === 'PUT') {
         const body = (await readBody(req)) as { content?: unknown };
@@ -494,8 +495,31 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         return sendJson(res, 201, { id: `b-${Math.random().toString(36).slice(2, 9)}` });
       }
     }
+    if (pathname.match(/^\/api\/books\/([^/]+)\/highlights$/)) {
+      return sendJson(res, 200, []);
+    }
 
-    // 11. AI status
+    // 11. Storage & Search
+    if (pathname === '/api/account/storage') {
+      const booksBytes = store.books.reduce((acc, b) => acc + (b.size || 0), 0);
+      return sendJson(res, 200, {
+        used: booksBytes,
+        limit: 200 * 1024 * 1024,
+        books: { count: store.books.length, bytes: booksBytes },
+        images: { count: 0, bytes: 0 },
+      });
+    }
+
+    if (pathname === '/api/search-index') {
+      return sendJson(res, 200, {
+        subjects: store.subjects.map((s) => ({ id: s.id, name: s.name })),
+        notebooks: store.notebooks.map((n) => ({ id: n.id, title: n.title, subjectId: n.subjectId })),
+        books: store.books.map((b) => ({ id: b.id, title: b.title, author: b.author })),
+        decks: store.decks.map((d) => ({ id: d.id, title: d.title })),
+      });
+    }
+
+    // 12. AI status
     if (pathname === '/api/ai/status') {
       return sendJson(res, 200, { configured: Boolean(process.env.GEMINI_API_KEY) });
     }
